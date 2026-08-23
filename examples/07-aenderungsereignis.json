@@ -1,0 +1,12 @@
+{
+  "_beschreibung": "Ein Änderungsereignis. Es enthält bewusst keine Fachdaten — nur Typ, Zeitpunkt, die URL der betroffenen Ressource und deren ETag. Der Berechtigte entscheidet selbst, wann und in welcher Granularität er abruft; kennt er den ETag bereits, kann er den Abruf ganz überspringen. Zum Vergleich: In der konsultierten Fassung wird bei jeder Änderung das vollständige Lokationsbündel mit allen Zeitscheiben an alle Berechtigten versandt.",
+  "_schema": "ChangeEvent",
+  "type": "locationBundleChanged",
+  "eventId": "7f3e9a10-2b4c-4d5e-9f60-1a2b3c4d5e6f",
+  "occurredAt": "2027-10-14T11:05:12Z",
+  "resource": {
+    "href": "/nb/2026-2/location-bundles/FXY98765432",
+    "title": "Lokationsbündel FXY98765432"
+  },
+  "etag": "\"a3f1c9e2\""
+}

@@ -1,0 +1,114 @@
+{
+  "_beschreibung": "Überschusseinspeisung: PV-Anlage mit Eigenverbrauch. Zweirichtungszähler an einer Messlokation, daraus eine Verbrauchs- und eine Erzeugungsmarktlokation. Zeigt zwei Zeitscheiben: Zubau eines Speichers zum 01.01.2028, mit explizitem validTo auf der ersten Scheibe.",
+  "data": {
+    "type": "Lokationsbuendel",
+    "locationBundleId": "FAB12345678",
+    "href": "/nb/2026-2/location-bundles/FAB12345678",
+    "networkOperator": {
+      "marketPartnerId": "9900987654321",
+      "role": "NB"
+    },
+    "changedAt": "2027-11-02T14:45:00Z",
+    "timeSlices": [
+      {
+        "href": "/nb/2026-2/location-bundles/FAB12345678/time-slices/2027-10-01",
+        "validFrom": "2027-10-01",
+        "validTo": "2028-01-01",
+        "members": [
+          {
+            "type": "Netzlokation",
+            "neloId": "EAB12345678",
+            "href": "/nb/2026-2/network-locations/EAB12345678"
+          },
+          {
+            "type": "Messlokation",
+            "meloId": "DE00014545768S0000000000000004711",
+            "href": "/nb/2026-2/metering-locations/DE00014545768S0000000000000004711",
+            "meteringPointOperator": {
+              "marketPartnerId": "9900123456789",
+              "role": "MSB"
+            },
+            "metering": {
+              "type": "iMS",
+              "configurationId": "K-2027-0815",
+              "obisCodes": ["1-0:1.8.0", "1-0:2.8.0"]
+            }
+          },
+          {
+            "type": "Marktlokation",
+            "maloId": "57685676748",
+            "supplier": { "marketPartnerId": "9900555444333", "role": "LF" },
+            "transmissionSystemOperator": { "marketPartnerId": "9900111222333", "role": "UENB" }
+          },
+          {
+            "type": "Marktlokation",
+            "maloId": "41234567890",
+            "supplier": { "marketPartnerId": "9900555444333", "role": "LF" },
+            "transmissionSystemOperator": { "marketPartnerId": "9900111222333", "role": "UENB" }
+          },
+          {
+            "type": "TechnischeRessource",
+            "trId": "DAB12345678",
+            "href": "/nb/2026-2/technical-resources/DAB12345678"
+          }
+        ],
+        "relations": [
+          { "kind": "NetzlokationZuMesslokation", "from": "EAB12345678", "to": "DE00014545768S0000000000000004711" },
+          { "kind": "MesslokationZuMarktlokation", "from": "DE00014545768S0000000000000004711", "to": "57685676748" },
+          { "kind": "MesslokationZuMarktlokation", "from": "DE00014545768S0000000000000004711", "to": "41234567890" },
+          { "kind": "MarktlokationZuTechnischerRessource", "from": "41234567890", "to": "DAB12345678" }
+        ]
+      },
+      {
+        "href": "/nb/2026-2/location-bundles/FAB12345678/time-slices/2028-01-01",
+        "validFrom": "2028-01-01",
+        "validTo": null,
+        "members": [
+          {
+            "type": "Netzlokation",
+            "neloId": "EAB12345678"
+          },
+          {
+            "type": "Messlokation",
+            "meloId": "DE00014545768S0000000000000004711",
+            "metering": {
+              "type": "iMS",
+              "configurationId": "K-2028-0042",
+              "obisCodes": ["1-0:1.8.0", "1-0:2.8.0"]
+            }
+          },
+          {
+            "type": "Marktlokation",
+            "maloId": "57685676748",
+            "supplier": { "marketPartnerId": "9900555444333", "role": "LF" }
+          },
+          {
+            "type": "Marktlokation",
+            "maloId": "41234567890",
+            "supplier": { "marketPartnerId": "9900555444333", "role": "LF" }
+          },
+          {
+            "type": "TechnischeRessource",
+            "trId": "DAB12345678"
+          },
+          {
+            "type": "TechnischeRessource",
+            "trId": "DCD98765432"
+          },
+          {
+            "type": "SteuerbareRessource",
+            "srId": "CAB12345678",
+            "href": "/nb/2026-2/controllable-resources/CAB12345678"
+          }
+        ],
+        "relations": [
+          { "kind": "NetzlokationZuMesslokation", "from": "EAB12345678", "to": "DE00014545768S0000000000000004711" },
+          { "kind": "MesslokationZuMarktlokation", "from": "DE00014545768S0000000000000004711", "to": "57685676748" },
+          { "kind": "MesslokationZuMarktlokation", "from": "DE00014545768S0000000000000004711", "to": "41234567890" },
+          { "kind": "MarktlokationZuTechnischerRessource", "from": "41234567890", "to": "DAB12345678" },
+          { "kind": "MarktlokationZuTechnischerRessource", "from": "57685676748", "to": "DCD98765432" }
+        ]
+      }
+    ]
+  }
+}

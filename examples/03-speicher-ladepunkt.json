@@ -1,0 +1,87 @@
+{
+  "_beschreibung": "Speicher und Ladepunkt hinter einem Netzanschluss mit Unterzählung — der Fall, für den die Festlegung MiSpeL (Az. 618-25-02) die Rechenformeln zur anteiligen Zuordnung viertelstündlicher Mengen definiert. Zeigt eine Messlokationskaskade (Hauptzähler mit zwei Unterzählern), Tranchen an der Erzeugungsmarktlokation und eine steuerbare Ressource. Genau dieser Fall war unter der bisherigen Codeliste der Lokationsbündelstrukturen typischerweise nur als 'nicht standardisiert' abbildbar.",
+  "data": {
+    "type": "Lokationsbuendel",
+    "locationBundleId": "FXY98765432",
+    "networkOperator": { "marketPartnerId": "9900987654321", "role": "NB" },
+    "changedAt": "2027-10-05T06:00:00Z",
+    "timeSlices": [
+      {
+        "validFrom": "2027-10-01",
+        "validTo": null,
+        "members": [
+          { "type": "Netzlokation", "neloId": "EXY98765432" },
+
+          {
+            "type": "Messlokation",
+            "meloId": "DE00014545768S0000000000000009001",
+            "meteringPointOperator": { "marketPartnerId": "9900123456789", "role": "MSB" },
+            "metering": {
+              "type": "iMS",
+              "configurationId": "K-2027-1000",
+              "obisCodes": ["1-0:1.8.0", "1-0:2.8.0"]
+            }
+          },
+          {
+            "type": "Messlokation",
+            "meloId": "DE00014545768S0000000000000009002",
+            "meteringPointOperator": { "marketPartnerId": "9900123456789", "role": "MSB" },
+            "metering": {
+              "type": "iMS",
+              "configurationId": "K-2027-1001",
+              "obisCodes": ["1-0:1.8.0", "1-0:2.8.0"]
+            }
+          },
+          {
+            "type": "Messlokation",
+            "meloId": "DE00014545768S0000000000000009003",
+            "meteringPointOperator": { "marketPartnerId": "9900123456789", "role": "MSB" },
+            "metering": {
+              "type": "mME",
+              "obisCodes": ["1-0:1.8.0"]
+            }
+          },
+
+          {
+            "type": "Marktlokation",
+            "maloId": "57685676748",
+            "supplier": { "marketPartnerId": "9900555444333", "role": "LF" }
+          },
+          {
+            "type": "Marktlokation",
+            "maloId": "41234567890",
+            "supplier": { "marketPartnerId": "9900555444333", "role": "LF" }
+          },
+
+          { "type": "Tranche", "trancheId": "41234567801", "supplier": { "marketPartnerId": "9900555444333", "role": "LF" } },
+          { "type": "Tranche", "trancheId": "41234567802", "supplier": { "marketPartnerId": "9900777888999", "role": "LF" } },
+
+          { "type": "TechnischeRessource", "trId": "DXY98765432" },
+          { "type": "TechnischeRessource", "trId": "DXY98765433" },
+          { "type": "TechnischeRessource", "trId": "DXY98765434" },
+
+          { "type": "SteuerbareRessource", "srId": "CXY98765432" }
+        ],
+        "relations": [
+          { "kind": "NetzlokationZuMesslokation", "from": "EXY98765432", "to": "DE00014545768S0000000000000009001" },
+
+          { "kind": "MesslokationZuMesslokation", "from": "DE00014545768S0000000000000009001", "to": "DE00014545768S0000000000000009002" },
+          { "kind": "MesslokationZuMesslokation", "from": "DE00014545768S0000000000000009001", "to": "DE00014545768S0000000000000009003" },
+
+          { "kind": "MesslokationZuMarktlokation", "from": "DE00014545768S0000000000000009001", "to": "57685676748" },
+          { "kind": "MesslokationZuMarktlokation", "from": "DE00014545768S0000000000000009002", "to": "41234567890" },
+
+          { "kind": "MesslokationZuTechnischerRessource", "from": "DE00014545768S0000000000000009002", "to": "DXY98765433" },
+          { "kind": "MesslokationZuTechnischerRessource", "from": "DE00014545768S0000000000000009003", "to": "DXY98765434" },
+
+          { "kind": "MarktlokationZuTechnischerRessource", "from": "41234567890", "to": "DXY98765433" },
+          { "kind": "MarktlokationZuTechnischerRessource", "from": "57685676748", "to": "DXY98765434" },
+          { "kind": "MarktlokationZuTechnischerRessource", "from": "57685676748", "to": "DXY98765432" },
+
+          { "kind": "MarktlokationZuTranche", "from": "41234567890", "to": "41234567801" },
+          { "kind": "MarktlokationZuTranche", "from": "41234567890", "to": "41234567802" }
+        ]
+      }
+    ]
+  }
+}

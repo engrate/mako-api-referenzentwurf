@@ -1,0 +1,32 @@
+{
+  "_beschreibung": "NEGATIVBEISPIEL — dieser Payload MUSS vom Validator abgelehnt werden. Einer pauschalen Messlokation ist eine OBIS-Kennzahl und eine Konfigurations-ID zugeordnet. Fachlich ist das unmöglich: Eine pauschale Messlokation hat keine Messeinrichtung. In der konsultierten Fassung wäre dieser Payload schemagültig, weil die Unterscheidung dort gar nicht modelliert ist und die entsprechende Bedingung nur als natürlichsprachliche Bedingung im Anwendungshandbuch steht. Der Fehler fiele erst im Produktivbetrieb auf — als Klärfall. Hier lehnt ihn jeder Standardvalidator zur Entwurfszeit ab.",
+  "_erwartet": "ungueltig",
+  "data": {
+    "type": "Lokationsbuendel",
+    "locationBundleId": "FZZ00000001",
+    "networkOperator": { "marketPartnerId": "9900987654321", "role": "NB" },
+    "timeSlices": [
+      {
+        "validFrom": "2027-10-01",
+        "validTo": null,
+        "members": [
+          { "type": "Netzlokation", "neloId": "EZZ00000001" },
+          {
+            "type": "Messlokation",
+            "meloId": "DE00014545768S0000000000000003054",
+            "metering": {
+              "type": "pauschal",
+              "configurationId": "K-2027-9999",
+              "obisCodes": ["1-0:1.8.0"]
+            }
+          },
+          { "type": "Marktlokation", "maloId": "57685676748" }
+        ],
+        "relations": [
+          { "kind": "NetzlokationZuMesslokation", "from": "EZZ00000001", "to": "DE00014545768S0000000000000003054" },
+          { "kind": "MesslokationZuMarktlokation", "from": "DE00014545768S0000000000000003054", "to": "57685676748" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+# Abhaengigkeiten des Pruefwerkzeugs tools/validate.py
+openapi-spec-validator>=0.7
+jsonschema>=4.20
+PyYAML>=6.0

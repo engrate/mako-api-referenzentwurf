@@ -1,0 +1,52 @@
+{
+  "_beschreibung": "Ein Clearing-Fall als Ressource mit Zustand. Der Lieferant hat beim Abruf festgestellt, dass ihm eine Tranche fehlt, und eröffnet einen Fall. observedETag hält fest, auf welchen Stand er sich bezieht — auch wenn der Netzbetreiber zwischenzeitlich ändert. Der Fall hat eine URL, eine Frist und einen definierten Endzustand. In der konsultierten Fassung trägt der Clearing-Aufruf keine Vorgangsreferenz, kennt keinen Antwortkanal und hat keinen Endzustand.",
+  "_schema": "ClearingCaseDocument",
+  "data": {
+    "type": "ClearingFall",
+    "clearingCaseId": "c4a1b2d3-0e5f-4a6b-8c7d-9e0f1a2b3c4d",
+    "href": "/nb/2026-2/clearing-cases/c4a1b2d3-0e5f-4a6b-8c7d-9e0f1a2b3c4d",
+    "state": "beigelegt",
+    "openedBy": { "marketPartnerId": "9900555444333", "role": "LF" },
+    "openedAt": "2027-10-12T09:30:00Z",
+    "dueAt": "2027-10-26T22:00:00Z",
+    "subject": {
+      "locationBundle": { "href": "/nb/2026-2/location-bundles/FXY98765432" },
+      "timeSlice": { "href": "/nb/2026-2/location-bundles/FXY98765432/time-slices/2027-10-01" }
+    },
+    "expected": {
+      "validFrom": "2027-10-01",
+      "validTo": null,
+      "members": [
+        { "type": "Netzlokation", "neloId": "EXY98765432" },
+        {
+          "type": "Messlokation",
+          "meloId": "DE00014545768S0000000000000009002",
+          "metering": { "type": "iMS", "configurationId": "K-2027-1001", "obisCodes": ["1-0:1.8.0", "1-0:2.8.0"] }
+        },
+        { "type": "Marktlokation", "maloId": "41234567890" },
+        { "type": "Tranche", "trancheId": "41234567801" },
+        { "type": "Tranche", "trancheId": "41234567802" },
+        { "type": "Tranche", "trancheId": "41234567803" }
+      ],
+      "relations": [
+        { "kind": "NetzlokationZuMesslokation", "from": "EXY98765432", "to": "DE00014545768S0000000000000009002" },
+        { "kind": "MesslokationZuMarktlokation", "from": "DE00014545768S0000000000000009002", "to": "41234567890" },
+        { "kind": "MarktlokationZuTranche", "from": "41234567890", "to": "41234567801" },
+        { "kind": "MarktlokationZuTranche", "from": "41234567890", "to": "41234567802" },
+        { "kind": "MarktlokationZuTranche", "from": "41234567890", "to": "41234567803" }
+      ]
+    },
+    "reason": "Tranche 41234567803 ist seit 01.10.2027 beliefert, im Bündel jedoch nicht enthalten.",
+    "resolution": {
+      "decisionTree": "E_0594",
+      "responseCode": "A10",
+      "reason": "Tranche war beim Netzbetreiber noch nicht eingepflegt, wurde ergänzt.",
+      "correctedBundle": { "href": "/nb/2026-2/location-bundles/FXY98765432/time-slices/2027-10-01" },
+      "resolvedAt": "2027-10-14T11:05:00Z"
+    }
+  },
+  "links": {
+    "self": { "href": "/nb/2026-2/clearing-cases/c4a1b2d3-0e5f-4a6b-8c7d-9e0f1a2b3c4d" },
+    "bundle": { "href": "/nb/2026-2/location-bundles/FXY98765432" }
+  }
+}

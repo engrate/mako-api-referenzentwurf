@@ -1,0 +1,67 @@
+{
+  "_beschreibung": "Pauschale Marktlokation ohne Zähler — Straßenbeleuchtung. Mitteilung Nr. 57 verlangt, dass künftig jeder Marktlokation Strom mindestens eine Messlokation zugeordnet ist; für zählerlose Marktlokationen ist dies eine pauschale Messlokation mit Zählpunktbezeichnung, aber ohne Messeinrichtung. Der Typ 'pauschal' macht dies im Schema explizit: OBIS-Kennzahlen oder eine Konfigurations-ID sind hier nicht darstellbar.",
+  "data": {
+    "type": "Lokationsbuendel",
+    "locationBundleId": "F1234848431",
+    "href": "/nb/2026-2/location-bundles/F1234848431",
+    "networkOperator": {
+      "marketPartnerId": "9900987654321",
+      "role": "NB",
+      "href": "/nb/2026-2/market-partners/9900987654321"
+    },
+    "changedAt": "2027-09-14T08:12:03Z",
+    "timeSlices": [
+      {
+        "href": "/nb/2026-2/location-bundles/F1234848431/time-slices/2027-10-01",
+        "validFrom": "2027-10-01",
+        "validTo": null,
+        "members": [
+          {
+            "type": "Netzlokation",
+            "neloId": "E1234848431",
+            "href": "/nb/2026-2/network-locations/E1234848431"
+          },
+          {
+            "type": "Messlokation",
+            "meloId": "DE00014545768S0000000000000003054",
+            "href": "/nb/2026-2/metering-locations/DE00014545768S0000000000000003054",
+            "meteringPointOperator": {
+              "marketPartnerId": "9900123456789",
+              "role": "MSB"
+            },
+            "metering": {
+              "type": "pauschal",
+              "description": "Straßenbeleuchtung, pauschal abgerechnet, keine Messeinrichtung"
+            }
+          },
+          {
+            "type": "Marktlokation",
+            "maloId": "57685676748",
+            "href": "/nb/2026-2/market-locations/57685676748",
+            "supplier": {
+              "marketPartnerId": "9900555444333",
+              "role": "LF"
+            }
+          }
+        ],
+        "relations": [
+          {
+            "kind": "NetzlokationZuMesslokation",
+            "from": "E1234848431",
+            "to": "DE00014545768S0000000000000003054"
+          },
+          {
+            "kind": "MesslokationZuMarktlokation",
+            "from": "DE00014545768S0000000000000003054",
+            "to": "57685676748"
+          }
+        ]
+      }
+    ]
+  },
+  "links": {
+    "self": { "href": "/nb/2026-2/location-bundles/F1234848431" },
+    "timeSlices": { "href": "/nb/2026-2/location-bundles/F1234848431/time-slices" },
+    "clearingCases": { "href": "/nb/2026-2/location-bundles/F1234848431/clearing-cases" }
+  }
+}

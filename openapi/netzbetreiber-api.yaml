@@ -1,0 +1,1844 @@
+openapi: 3.1.0
+
+info:
+  title: Netzbetreiber-API (Referenzentwurf)
+  version: 2026-2.0.0
+  summary: Ressourcenorientierter Gegenentwurf zu locationBundleV1
+  description: |
+    **Referenzentwurf — kein offizielles Dokument der Bundesnetzagentur, des BDEW oder der
+    Projektgruppe EDI@Energy.**
+
+    Dieser Entwurf ist ein Konsultationsbeitrag zu Mitteilung Nr. 57 der Bundesnetzagentur. Er
+    modelliert denselben Fachinhalt wie die konsultierte Spezifikation
+    `api/masterData/locationBundleV1.yaml` (Branch `2026-07-31-consultation`) — jedoch
+    ressourcenorientiert nach REST-Architekturprinzipien, entsprechend den Empfehlungen des
+    gemeinsamen Konsultationsbeitrags „Gestaltung von Web-APIs für die Marktkommunikation"
+    (decarbon1ze, Mako365, hochfrequenz, metiundo, Kraken, sonnen) vom Oktober 2025.
+
+    Der Entwurf soll nicht vollständig sein. Er soll zeigen, dass der Fachinhalt des
+    Lokationsbündels ressourcenorientiert abbildbar ist, und woran sich die beiden Ansätze
+    konkret unterscheiden.
+
+    ## Was dieser Entwurf anders macht
+
+    | Aspekt | Konsultierte Fassung | Dieser Entwurf |
+    |---|---|---|
+    | HTTP-Verben | ausschließlich `POST` | `GET`, `PUT`, `PATCH`, `POST`, `DELETE` nach Semantik |
+    | Lesezugriff | nicht vorhanden | `GET` auf jede Ressource |
+    | Identität | Fachschlüssel im Body | URL je Ressource, Verlinkung über `href` |
+    | Aktualisierung | Vollübermittlung des gesamten Bündels | `PATCH` auf Teilressource, `If-Match` |
+    | Zeitscheiben-Ende | implizit über Beginn der Folgescheibe | `validFrom` **und** `validTo` explizit |
+    | Fachliche Bedingungen | Prosa im Anwendungshandbuch | `oneOf` + `discriminator` im Schema |
+    | Antwortkanal | zweiter `POST` in Gegenrichtung | HTTP-Statuscode und Response-Body |
+    | Fehlermeldung | kein Response-Body definiert | RFC 9457 Problem Details |
+    | Reklamation | Clearing ohne definierten Endzustand | Clearing-Fall als Ressource mit Zustandsmodell |
+    | Benachrichtigung | Vollversand an alle Berechtigten | Subscription + leichtgewichtiges Event |
+    | Sicherheit | nicht spezifiziert | OAuth 2.0 mit Scopes, mTLS als Alternative |
+    | Nebenläufigkeit | nicht geregelt | ETag / `If-Match` |
+    | Umsetzungsstand | nicht erkennbar | `GET /versions` |
+
+    ## Verhältnis zur bestehenden Regulierung
+
+    Der Entwurf ändert **keine** Fachlichkeit. Identifikatoren, Codelisten, Zeitpunkt-Semantik
+    (Tagesbeginn 00:00 Uhr gesetzlicher deutscher Zeit, angegeben in UTC) und die
+    Antwortcodes der Entscheidungsbaumdiagramme sind unverändert übernommen. Die
+    Marktrollen und ihre Zuständigkeiten bleiben unberührt: Der Netzbetreiber bleibt der
+    Verantwortliche für das Lokationsbündel; Lieferant, Messstellenbetreiber und
+    Messwertverarbeiter sind Berechtigte.
+
+    Geändert wird ausschließlich das Kommunikationsmuster: Der Verantwortliche **hält** die
+    Daten und stellt sie bereit; Berechtigte **rufen sie ab**, statt sie zugesandt und lokal
+    repliziert zu bekommen.
+
+  contact:
+    name: "[Unternehmen — Kontakt eintragen]"
+  license:
+    name: CC0-1.0
+    identifier: CC0-1.0
+
+servers:
+  - url: https://{host}/nb/{basePath}
+    description: |
+      Endpunkt der Netzbetreiber-API. Host und Basispfad werden über den Verzeichnisdienst
+      aufgelöst; die API-Kennung ist `nb`.
+    variables:
+      host:
+        default: api.example-netzbetreiber.de
+      basePath:
+        default: "2026-2"
+        description: |
+          Semester-Release. Zusätzlich steht der unveränderliche Pfad ohne Versionsangabe
+          zur Verfügung, der stets auf das aktuell verpflichtende Semester-Release zeigt,
+          sowie `v` für die Vorweg-Version.
+
+security:
+  - oauth2:
+      - lokationsbuendel:lesen
+
+tags:
+  - name: Lokationsbündel
+    description: Abruf und Pflege von Lokationsbündeln in der Hoheit des Netzbetreibers.
+  - name: Lokationen
+    description: Einzelressourcen der referenzierten Netz-, Markt- und Messlokationen.
+  - name: Clearing
+    description: Abweichende Sichtweisen als Vorgang mit definiertem Endzustand.
+  - name: Netzbetreiberwechsel
+    description: Übergabepaket beim Wechsel des zuständigen Netzbetreibers.
+  - name: Benachrichtigung
+    description: Abonnement von Änderungsereignissen.
+  - name: Betrieb
+    description: Umsetzungsstand und Betriebsinformationen.
+
+paths:
+
+  ############################################################################
+  # Lokationsbündel
+  ############################################################################
+
+  /location-bundles:
+    get:
+      tags: [Lokationsbündel]
+      operationId: listLocationBundles
+      summary: Lokationsbündel auflisten
+      description: |
+        Gibt die Lokationsbündel zurück, für die der aufrufende Marktpartner berechtigt ist.
+
+        Diese Operation ersetzt den Vollversand aller Bündel an alle Berechtigten. Der
+        Berechtigte fragt bedarfsgerecht ab — gefiltert nach der Lokation, die ihn
+        interessiert, oder nach dem Zeitpunkt der letzten Änderung.
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Cursor'
+        - name: market-location
+          in: query
+          description: Nur Bündel, die diese Marktlokation oder Tranche enthalten.
+          schema: { $ref: '#/components/schemas/MaloId' }
+        - name: metering-location
+          in: query
+          description: Nur Bündel, die diese Messlokation enthalten.
+          schema: { $ref: '#/components/schemas/MeloId' }
+        - name: network-location
+          in: query
+          description: Nur Bündel, die diese Netzlokation enthalten.
+          schema: { $ref: '#/components/schemas/NeloId' }
+        - name: changed-since
+          in: query
+          description: |
+            Nur Bündel, die seit diesem Zeitpunkt geändert wurden. Ermöglicht dem
+            Berechtigten einen inkrementellen Abgleich, ohne den Gesamtbestand zu übertragen.
+          schema: { type: string, format: date-time }
+        - name: valid-at
+          in: query
+          description: |
+            Nur Bündel, die zu diesem Stichtag Objekte enthalten. Ohne Angabe wird der
+            heutige Tag verwendet.
+          schema: { $ref: '#/components/schemas/DayBoundary' }
+        - name: sort
+          in: query
+          description: |
+            Abweichende Sortierung. Standard ist `locationBundleId` aufsteigend.
+          schema:
+            type: string
+            enum: [locationBundleId, -locationBundleId, changedAt, -changedAt]
+            default: locationBundleId
+      responses:
+        '200':
+          description: Liste der berechtigten Lokationsbündel.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+            Deprecation: { $ref: '#/components/headers/Deprecation' }
+            Sunset: { $ref: '#/components/headers/Sunset' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/LocationBundleList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /location-bundles/{locationBundleId}:
+    parameters:
+      - $ref: '#/components/parameters/LocationBundleId'
+    get:
+      tags: [Lokationsbündel]
+      operationId: getLocationBundle
+      summary: Lokationsbündel abrufen
+      description: |
+        Gibt das Lokationsbündel in der Sicht des verantwortlichen Netzbetreibers zurück.
+
+        Dies ist die zentrale Operation dieses Entwurfs. Ein Berechtigter, der zu Beginn
+        eines Geschäftsprozesses den aktuellen Stand abruft, kann auf einen Schiefstand
+        reagieren, **bevor** er Zusagen macht oder Folgetransaktionen auslöst. Damit
+        entfällt der überwiegende Teil der Anlässe, die heute zu Clearing führen.
+
+        Die Antwort ist über `ETag` cachefähig. Ein Berechtigter, der bereits einen Stand
+        kennt, sendet `If-None-Match` und erhält bei unverändertem Stand `304` ohne
+        Nutzdaten.
+      parameters:
+        - name: valid-at
+          in: query
+          description: |
+            Gibt nur die zu diesem Stichtag gültige Zeitscheibe zurück, statt aller
+            Zeitscheiben. Reduziert die Übertragungsmenge auf das tatsächlich Benötigte.
+          schema: { $ref: '#/components/schemas/DayBoundary' }
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Das Lokationsbündel.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/CacheControl' }
+            Last-Modified: { $ref: '#/components/headers/LastModified' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/LocationBundleDocument' }
+        '304':
+          description: Unverändert seit dem im `If-None-Match` angegebenen Stand.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    put:
+      tags: [Lokationsbündel]
+      operationId: replaceLocationBundle
+      summary: Lokationsbündel vollständig setzen
+      description: |
+        Setzt das Lokationsbündel vollständig. Nur der verantwortliche Netzbetreiber ist
+        hierzu berechtigt.
+
+        `PUT` ist nach HTTP-Semantik **idempotent**: Ein wiederholter identischer Aufruf
+        hat dieselbe Wirkung wie ein einzelner. Ein gesonderter Idempotenzschlüssel im
+        Header — wie ihn die konsultierte Fassung mit `initialTransactionId` einführt —
+        ist damit nicht erforderlich.
+
+        `If-Match` mit dem zuletzt gelesenen `ETag` verhindert, dass zwei parallele
+        Änderungen einander überschreiben. Ohne `If-Match` wird der Aufruf mit `428`
+        abgelehnt.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      security:
+        - oauth2: [lokationsbuendel:schreiben]
+      requestBody:
+        required: true
+        content:
+          application/vnd.edi-energy+json:
+            schema: { $ref: '#/components/schemas/LocationBundleWrite' }
+      responses:
+        '200':
+          description: Das aktualisierte Lokationsbündel.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/LocationBundleDocument' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+    patch:
+      tags: [Lokationsbündel]
+      operationId: patchLocationBundle
+      summary: Lokationsbündel teilweise ändern
+      description: |
+        Ändert einzelne Zeitscheiben, ohne das gesamte Bündel neu zu übertragen.
+
+        In der konsultierten Fassung erfordert jede Korrektur — auch die eines einzelnen
+        Feldes — die Vollübermittlung sämtlicher Zeitscheiben. Jede Vollübermittlung ist
+        eine Gelegenheit für einen Übertragungsfehler und erzwingt beim Empfänger einen
+        vollständigen Abgleich.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      security:
+        - oauth2: [lokationsbuendel:schreiben]
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/LocationBundleWrite' }
+      responses:
+        '200':
+          description: Das aktualisierte Lokationsbündel.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/LocationBundleDocument' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /location-bundles/{locationBundleId}/time-slices:
+    parameters:
+      - $ref: '#/components/parameters/LocationBundleId'
+    get:
+      tags: [Lokationsbündel]
+      operationId: listTimeSlices
+      summary: Zeitscheiben eines Lokationsbündels auflisten
+      description: |
+        Gibt die Zeitscheiben als eigene Listenressource zurück. Ein Berechtigter, der nur
+        wissen will, ob und wann sich die Zusammensetzung ändert, muss nicht das gesamte
+        Bündel übertragen.
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Cursor'
+        - name: valid-from
+          in: query
+          description: Nur Zeitscheiben, die an oder nach diesem Tag beginnen.
+          schema: { $ref: '#/components/schemas/DayBoundary' }
+      responses:
+        '200':
+          description: Die Zeitscheiben des Bündels.
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/TimeSliceList' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /location-bundles/{locationBundleId}/time-slices/{validFrom}:
+    parameters:
+      - $ref: '#/components/parameters/LocationBundleId'
+      - name: validFrom
+        in: path
+        required: true
+        description: Beginn der Zeitscheibe als Kalendertag (`YYYY-MM-DD`).
+        schema: { type: string, format: date }
+    get:
+      tags: [Lokationsbündel]
+      operationId: getTimeSlice
+      summary: Einzelne Zeitscheibe abrufen
+      responses:
+        '200':
+          description: Die Zeitscheibe.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/TimeSliceDocument' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Lokationsbündel]
+      operationId: replaceTimeSlice
+      summary: Einzelne Zeitscheibe setzen
+      description: |
+        Setzt genau eine Zeitscheibe. Idempotent nach HTTP-Semantik.
+      security:
+        - oauth2: [lokationsbuendel:schreiben]
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/vnd.edi-energy+json:
+            schema: { $ref: '#/components/schemas/TimeSliceWrite' }
+      responses:
+        '200':
+          description: Die aktualisierte Zeitscheibe.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/TimeSliceDocument' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+    delete:
+      tags: [Lokationsbündel]
+      operationId: deleteTimeSlice
+      summary: Zeitscheibe entfernen
+      security:
+        - oauth2: [lokationsbuendel:schreiben]
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Die Zeitscheibe wurde entfernt.
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  ############################################################################
+  # Lokationen als Einzelressourcen
+  ############################################################################
+
+  /network-locations/{neloId}:
+    parameters:
+      - name: neloId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/NeloId' }
+    get:
+      tags: [Lokationen]
+      operationId: getNetworkLocation
+      summary: Netzlokation abrufen
+      description: |
+        Die Netzlokation als eigene Ressource. In der konsultierten Fassung ist sie nur
+        eine ID innerhalb eines versandten Dokuments und kann nicht abgerufen werden.
+
+        Damit läuft eine Referenz auf eine dem Empfänger unbekannte Netzlokation dort ins
+        Leere und führt zur Zurückweisung des gesamten Dokuments. Hier kann der Empfänger
+        der Referenz folgen und das Objekt abrufen.
+      responses:
+        '200':
+          description: Die Netzlokation.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/NetworkLocationDocument' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /market-locations/{maloId}:
+    parameters:
+      - name: maloId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/MaloId' }
+    get:
+      tags: [Lokationen]
+      operationId: getMarketLocation
+      summary: Marktlokation oder Tranche abrufen
+      responses:
+        '200':
+          description: Die Marktlokation bzw. Tranche.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/MarketLocationDocument' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /metering-locations/{meloId}:
+    parameters:
+      - name: meloId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/MeloId' }
+    get:
+      tags: [Lokationen]
+      operationId: getMeteringLocation
+      summary: Messlokation abrufen
+      responses:
+        '200':
+          description: Die Messlokation.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/MeteringLocationDocument' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  ############################################################################
+  # Clearing
+  ############################################################################
+
+  /location-bundles/{locationBundleId}/clearing-cases:
+    parameters:
+      - $ref: '#/components/parameters/LocationBundleId'
+    get:
+      tags: [Clearing]
+      operationId: listClearingCases
+      summary: Clearing-Fälle zu einem Lokationsbündel auflisten
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Cursor'
+        - name: state
+          in: query
+          schema: { $ref: '#/components/schemas/ClearingState' }
+      responses:
+        '200':
+          description: Die Clearing-Fälle.
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/ClearingCaseList' }
+    post:
+      tags: [Clearing]
+      operationId: createClearingCase
+      summary: Clearing-Fall eröffnen
+      description: |
+        Eröffnet einen Clearing-Fall, wenn die Sicht des Berechtigten von der Sicht des
+        Netzbetreibers abweicht.
+
+        Der wesentliche Unterschied zur konsultierten Fassung: Das Clearing ist hier eine
+        **Ressource mit Zustand und Lebenszyklus**, nicht ein Aufruf ohne Rückbezug. Der
+        Fall hat eine URL, einen Zustand (`offen`, `inBearbeitung`, `beigelegt`,
+        `zurückgewiesen`), einen Eröffner, einen Zeitpunkt und eine Frist. Beide Seiten
+        können jederzeit abrufen, wie der Stand ist. In der konsultierten Fassung trägt der
+        Clearing-Aufruf keine Vorgangsreferenz und kennt keinen definierten Endzustand.
+
+        `POST` ist nicht idempotent. Um doppelte Fälle zu vermeiden, kann der Aufrufer den
+        Header `Idempotency-Key` setzen; ein Wiederholungsaufruf mit demselben Schlüssel
+        gibt den bereits erzeugten Fall zurück.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Optionaler Schlüssel zur Duplikatvermeidung bei Wiederholungsaufrufen.
+          schema: { type: string, format: uuid }
+      security:
+        - oauth2: [clearing:schreiben]
+      requestBody:
+        required: true
+        content:
+          application/vnd.edi-energy+json:
+            schema: { $ref: '#/components/schemas/ClearingCaseWrite' }
+      responses:
+        '201':
+          description: Der Clearing-Fall wurde eröffnet.
+          headers:
+            Location:
+              description: URL des erzeugten Clearing-Falls.
+              schema: { type: string, format: uri-reference }
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/ClearingCaseDocument' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: |
+            Zu demselben Sachverhalt besteht bereits ein offener Clearing-Fall. Der
+            Response-Body verweist über `instance` auf dessen URL.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /clearing-cases/{clearingCaseId}:
+    parameters:
+      - name: clearingCaseId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Clearing]
+      operationId: getClearingCase
+      summary: Clearing-Fall abrufen
+      responses:
+        '200':
+          description: Der Clearing-Fall.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/ClearingCaseDocument' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Clearing]
+      operationId: patchClearingCase
+      summary: Clearing-Fall fortschreiben oder abschließen
+      description: |
+        Ändert den Zustand des Clearing-Falls. Zulässige Übergänge:
+
+        - `offen` → `inBearbeitung` (durch den Netzbetreiber)
+        - `offen` | `inBearbeitung` → `beigelegt` (durch den Netzbetreiber, nachdem er das
+          Bündel korrigiert hat — `resolution.correctedBundle` verweist auf den neuen Stand)
+        - `offen` | `inBearbeitung` → `zurückgewiesen` (durch den Netzbetreiber, mit
+          Antwortcode aus dem Entscheidungsbaumdiagramm und Begründung)
+        - `offen` | `inBearbeitung` → `zurückgezogen` (durch den Eröffner)
+
+        Ein unzulässiger Übergang wird mit `422` und einem Problem-Details-Dokument
+        abgelehnt, das den aktuellen und die zulässigen Folgezustände nennt.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      security:
+        - oauth2: [clearing:schreiben]
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/ClearingCasePatch' }
+      responses:
+        '200':
+          description: Der aktualisierte Clearing-Fall.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/ClearingCaseDocument' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  ############################################################################
+  # Netzbetreiberwechsel
+  ############################################################################
+
+  /network-operator-change-packages:
+    post:
+      tags: [Netzbetreiberwechsel]
+      operationId: createNetworkOperatorChangePackage
+      summary: Übergabepaket anfordern
+      description: |
+        Fordert das Übergabepaket zu einem Netzbetreiberwechsel an.
+
+        Diese Operation demonstriert den **standardkonformen Umgang mit verzögerten
+        Antworten**. Die Zusammenstellung eines Übergabepakets kann umfangreich sein und
+        innerhalb eines technischen Timeouts nicht abschließbar. Statt eine Rückrufkonstruktion
+        mit selbst geführtem Zustand einzuführen, nutzt dieser Entwurf das in HTTP dafür
+        vorgesehene Verfahren:
+
+        1. Der Server antwortet mit `202 Accepted` und dem `Location`-Header auf die URL der
+           künftigen Ergebnisressource, dazu `Retry-After` mit dem frühesten sinnvollen
+           Abrufzeitpunkt.
+        2. Solange das Ergebnis aussteht, antwortet ein `GET` auf diese URL erneut mit `202`
+           und aktualisiertem `Retry-After`.
+        3. Sobald das Ergebnis vorliegt, gibt derselbe `GET` mit `200` die Ressource zurück.
+
+        Der Aufrufer muss dafür keinen Vorgangszustand vorhalten — die URL **ist** der
+        Zustand.
+      security:
+        - oauth2: [netzbetreiberwechsel:schreiben]
+      requestBody:
+        required: true
+        content:
+          application/vnd.edi-energy+json:
+            schema: { $ref: '#/components/schemas/NetworkOperatorChangeRequest' }
+      responses:
+        '202':
+          description: |
+            Die Anforderung wurde angenommen. Das Ergebnis wird unter der in `Location`
+            genannten URL bereitgestellt.
+          headers:
+            Location:
+              description: URL der Ergebnisressource.
+              schema: { type: string, format: uri-reference }
+            Retry-After:
+              description: Frühester sinnvoller Abrufzeitpunkt in Sekunden.
+              schema: { type: integer, minimum: 1 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /network-operator-change-packages/{packageId}:
+    parameters:
+      - name: packageId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/NetworkOperatorChangePackageId' }
+    get:
+      tags: [Netzbetreiberwechsel]
+      operationId: getNetworkOperatorChangePackage
+      summary: Übergabepaket abrufen
+      responses:
+        '200':
+          description: Das vollständige Übergabepaket.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/NetworkOperatorChangePackageDocument' }
+        '202':
+          description: |
+            Das Paket wird noch zusammengestellt. `Retry-After` nennt den frühesten
+            sinnvollen erneuten Abrufzeitpunkt.
+          headers:
+            Retry-After:
+              schema: { type: integer, minimum: 1 }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/PendingResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  ############################################################################
+  # Benachrichtigung
+  ############################################################################
+
+  /subscriptions:
+    get:
+      tags: [Benachrichtigung]
+      operationId: listSubscriptions
+      summary: Eigene Abonnements auflisten
+      responses:
+        '200':
+          description: Die Abonnements des aufrufenden Marktpartners.
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/SubscriptionList' }
+    post:
+      tags: [Benachrichtigung]
+      operationId: createSubscription
+      summary: Änderungsbenachrichtigung abonnieren
+      description: |
+        Registriert den aufrufenden Marktpartner für Benachrichtigungen über Änderungen an
+        Lokationsbündeln, für die er berechtigt ist.
+
+        Die Benachrichtigung enthält **nicht** die geänderten Daten, sondern nur die
+        Information, dass eine Änderung vorliegt, und die URL der betroffenen Ressource.
+        Der Berechtigte ruft die Daten zu einem für ihn passenden Zeitpunkt und in der von
+        ihm benötigten Granularität ab.
+
+        Der Konsultationsbeitrag vom Oktober 2025 empfiehlt, dass Berechtigte sich selbst
+        registrieren, bei Wegfall der Berechtigung jedoch automatisch de-registriert und
+        darüber benachrichtigt werden. Dieser Entwurf folgt dem: Das Abonnement wird
+        serverseitig beendet und ein abschließendes Ereignis `subscriptionRevoked`
+        zugestellt.
+      security:
+        - oauth2: [benachrichtigung:schreiben]
+      requestBody:
+        required: true
+        content:
+          application/vnd.edi-energy+json:
+            schema: { $ref: '#/components/schemas/SubscriptionWrite' }
+      responses:
+        '201':
+          description: Das Abonnement wurde eingerichtet.
+          headers:
+            Location:
+              schema: { type: string, format: uri-reference }
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/SubscriptionDocument' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+      callbacks:
+        locationBundleChanged:
+          '{$request.body#/callbackUrl}':
+            post:
+              operationId: onLocationBundleChanged
+              summary: Änderungsereignis (vom Server an den Abonnenten)
+              description: |
+                Leichtgewichtiges Ereignis. Enthält bewusst keine Fachdaten — nur Typ,
+                Zeitpunkt und die URL der geänderten Ressource.
+              requestBody:
+                required: true
+                content:
+                  application/vnd.edi-energy+json:
+                    schema: { $ref: '#/components/schemas/ChangeEvent' }
+              responses:
+                '204':
+                  description: Ereignis entgegengenommen.
+
+  /subscriptions/{subscriptionId}:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Benachrichtigung]
+      operationId: getSubscription
+      summary: Abonnement abrufen
+      responses:
+        '200':
+          description: Das Abonnement.
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/SubscriptionDocument' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Benachrichtigung]
+      operationId: deleteSubscription
+      summary: Abonnement beenden
+      security:
+        - oauth2: [benachrichtigung:schreiben]
+      responses:
+        '204':
+          description: Das Abonnement wurde beendet.
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  ############################################################################
+  # Betrieb
+  ############################################################################
+
+  /versions:
+    get:
+      tags: [Betrieb]
+      operationId: getImplementationStatus
+      summary: Umsetzungsstand dieser API
+      description: |
+        Gibt maschinenlesbar zurück, welche Endpunkte und Ressourcen dieser Marktpartner
+        vollständig, teilweise oder nicht implementiert hat, sowie welches Semester-Release
+        und welche Vorweg-Version angeboten werden.
+
+        Diese Ressource beantwortet eine Frage, die heute nach jedem Format-Update erneut
+        durch Ausprobieren geklärt werden muss.
+      security: []
+      responses:
+        '200':
+          description: Der Umsetzungsstand.
+          content:
+            application/vnd.edi-energy+json:
+              schema: { $ref: '#/components/schemas/ImplementationStatus' }
+
+components:
+
+  ##########################################################################
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: |
+        OAuth 2.0. Die Authentisierung des Clients am Authorization Server erfolgt in der
+        Ausbaustufe 1 über das Signaturzertifikat der Smart-Metering-PKI; die Architektur
+        ist so angelegt, dass sie später um OpenID Connect und föderierte Identitäten
+        (etwa europäische ID-Wallets) erweitert werden kann, ohne die Ressourcen-APIs zu
+        ändern.
+
+        Damit werden drei Anforderungen adressiert, die eine ausschließlich
+        zertifikatsbasierte Marktpartner-Authentisierung nicht abbilden kann:
+        Zugriff von Letztverbrauchern auf ihre eigenen Daten, übertragbare Berechtigungen
+        an Dritte und Anschlussfähigkeit an übergreifende Datenräume.
+      flows:
+        clientCredentials:
+          tokenUrl: https://authz.example-netzbetreiber.de/oauth2/token
+          scopes:
+            lokationsbuendel:lesen: Lokationsbündel und Lokationen lesen
+            lokationsbuendel:schreiben: Lokationsbündel ändern (nur verantwortlicher Netzbetreiber)
+            clearing:schreiben: Clearing-Fälle eröffnen und fortschreiben
+            netzbetreiberwechsel:schreiben: Übergabepakete anfordern
+            benachrichtigung:schreiben: Abonnements verwalten
+        authorizationCode:
+          authorizationUrl: https://authz.example-netzbetreiber.de/oauth2/authorize
+          tokenUrl: https://authz.example-netzbetreiber.de/oauth2/token
+          scopes:
+            lokationsbuendel:lesen: Lokationsbündel und Lokationen lesen
+          # Vorgesehen für die Ausbaustufe 2: Freigabe durch Letztverbraucher bzw.
+          # Anschlussnehmer an einen von ihnen beauftragten Dienstleister.
+    mtls:
+      type: mutualTLS
+      description: |
+        Alternativ zulässig für die reine Marktpartner-zu-Marktpartner-Kommunikation, mit
+        Zertifikaten der Smart-Metering-PKI in der Rolle „passiver EMT" gemäß den
+        Regelungen zum Übertragungsweg für API-Webdienste.
+
+  ##########################################################################
+  parameters:
+
+    LocationBundleId:
+      name: locationBundleId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/LocationBundleId' }
+
+    PageSize:
+      name: page-size
+      in: query
+      description: Maximale Anzahl Elemente je Seite.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    Cursor:
+      name: cursor
+      in: query
+      description: |
+        Fortsetzungsmarke aus `links.next` einer vorangegangenen Antwort. Für Clients ist
+        der Wert undurchsichtig; aus seiner Struktur darf nicht auf den verwendeten
+        Paginierungsmechanismus geschlossen werden.
+      schema: { type: string }
+
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: |
+        Der zuletzt gelesene `ETag`. Verhindert, dass eine zwischenzeitliche Änderung eines
+        anderen Aufrufers unbemerkt überschrieben wird.
+      schema: { type: string }
+
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: Bereits bekannter `ETag`. Führt bei unverändertem Stand zu `304`.
+      schema: { type: string }
+
+  ##########################################################################
+  headers:
+
+    ETag:
+      description: Version der Ressource für bedingte Anfragen.
+      schema: { type: string }
+
+    LastModified:
+      description: Zeitpunkt der letzten Änderung.
+      schema: { type: string }
+
+    CacheControl:
+      description: |
+        Zwischenspeicherbarkeit. Stammdaten dieser Art ändern sich selten; sinnvolle
+        Vorgaben entlasten sowohl den Anbieter als auch die Prozesslaufzeit beim Abrufer.
+      schema: { type: string, examples: ["private, max-age=3600"] }
+
+    Deprecation:
+      description: |
+        Gesetzt, sobald die Ressource abgekündigt ist (RFC 8594). Maschinenlesbar, im
+        Unterschied zu einem Freitexthinweis.
+      schema: { type: string }
+
+    Sunset:
+      description: Zeitpunkt, ab dem die Ressource nicht mehr bereitgestellt wird (RFC 8594).
+      schema: { type: string }
+
+    RetryAfter:
+      description: Wartezeit vor dem nächsten Versuch, in Sekunden.
+      schema: { type: integer, minimum: 1 }
+
+  ##########################################################################
+  responses:
+
+    BadRequest:
+      description: Fehlerhafte Anfrage.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Nicht authentisiert.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: |
+        Authentisiert, aber für die angeforderte Ressource nicht berechtigt. Die
+        Berechtigung ergibt sich aus der fachlichen Zuordnung des Marktpartners zu Objekt
+        und Zeitraum.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Ressource nicht vorhanden.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Fachlicher Konflikt mit dem aktuellen Zustand der Ressource.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionFailed:
+      description: |
+        Der in `If-Match` angegebene `ETag` entspricht nicht dem aktuellen Stand — die
+        Ressource wurde zwischenzeitlich geändert.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionRequired:
+      description: Schreibender Zugriff ohne `If-Match` ist nicht zulässig.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    UnprocessableEntity:
+      description: |
+        Syntaktisch gültig, aber fachlich nicht verarbeitbar. `errors` benennt die
+        betroffenen Stellen über JSON-Pointer nach RFC 6901.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooManyRequests:
+      description: Ratenbegrenzung erreicht.
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ServiceUnavailable:
+      description: Vorübergehend nicht verfügbar.
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  ##########################################################################
+  schemas:
+
+    # ---------- Identifikatoren (unverändert aus der konsultierten Fassung) ----------
+
+    LocationBundleId:
+      type: string
+      pattern: '^F[A-Z\d]{9}\d$'
+      description: |
+        Lokationsbündel-ID.
+
+        Muster und Beispiel sind unverändert aus der konsultierten Fassung
+        übernommen (`schema/identifier/locationBundleId.yaml`).
+
+        **Hinweis:** Issue #175 im Repository `EDI-Energy/api-electricity`
+        (eingereicht am 20.08.2026) macht geltend, dass nach der
+        Bildungsvorschrift an der ersten Stelle `G` statt `F` stehen muss.
+        Wir teilen diese Auffassung. Wird das Issue angenommen, sind Muster
+        und Beispiele hier und in den beigefügten Beispiel-Payloads
+        entsprechend auf `G` zu ändern. Wir haben bewusst nicht vorgegriffen,
+        damit dieser Entwurf gegen den konsultierten Stand vergleichbar
+        bleibt.
+      examples: ["F1234848431"]
+
+    NeloId:
+      type: string
+      pattern: '^E[A-Z\d]{9}\d$'
+      description: Netzlokations-ID.
+      examples: ["E1234848431"]
+
+    MaloId:
+      type: string
+      pattern: '^\d{11}$'
+      description: Identifiziert die Marktlokation oder Tranche.
+      examples: ["57685676748"]
+
+    MeloId:
+      type: string
+      pattern: '^DE\d{11}[A-Z\d]{20}$'
+      description: Messlokations-ID (Zählpunktbezeichnung).
+      examples: ["DE00014545768S0000000000000003054"]
+
+    TrId:
+      type: string
+      pattern: '^D[A-Z\d]{9}\d$'
+      description: ID der technischen Ressource.
+      examples: ["D1234848431"]
+
+    SrId:
+      type: string
+      pattern: '^C[A-Z\d]{9}\d$'
+      description: ID der steuerbaren Ressource.
+      examples: ["C1234848431"]
+
+    MarketPartnerId:
+      type: string
+      pattern: '^\d{13}$'
+      description: Marktpartner-ID.
+      examples: ["9900987654321"]
+
+    NetworkOperatorChangePackageId:
+      type: string
+      pattern: '^P[A-Z\d]{9}\d$'
+      examples: ["P1234848431"]
+
+    DayBoundary:
+      type: string
+      format: date
+      description: |
+        Kalendertag. Der zugehörige Zeitpunkt ist stets der Tagesbeginn 00:00 Uhr
+        gesetzlicher deutscher Zeit.
+
+        Anmerkung zur Abweichung von der konsultierten Fassung: Dort wird derselbe
+        Sachverhalt als UTC-Zeitstempel mit Regex-Muster übertragen
+        (`2023-08-01T22:00:00Z` für den 2. August 2023). Das ist fehleranfällig, weil der
+        Zeitzonenversatz zwischen Sommer- und Winterzeit wechselt und ein Leser den
+        Kalendertag zurückrechnen muss. Ein Datum ohne Uhrzeit drückt genau das aus, was
+        gemeint ist, und ist nicht falsch interpretierbar.
+      examples: ["2027-10-01"]
+
+    # ---------- Verlinkung ----------
+
+    Link:
+      type: object
+      required: [href]
+      properties:
+        href:
+          type: string
+          format: uri-reference
+          description: URL der referenzierten Ressource.
+        title:
+          type: string
+
+    ListLinks:
+      type: object
+      properties:
+        self: { $ref: '#/components/schemas/Link' }
+        next:
+          allOf: [{ $ref: '#/components/schemas/Link' }]
+          description: Nächste Seite. Fehlt, wenn keine weiteren Elemente vorliegen.
+        prev: { $ref: '#/components/schemas/Link' }
+
+    # ---------- Lokationsbündel ----------
+
+    LocationBundleDocument:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/LocationBundle' }
+        links:
+          type: object
+          properties:
+            self: { $ref: '#/components/schemas/Link' }
+            timeSlices: { $ref: '#/components/schemas/Link' }
+            clearingCases: { $ref: '#/components/schemas/Link' }
+
+    LocationBundleList:
+      type: object
+      required: [data, links]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/LocationBundleSummary' }
+        links: { $ref: '#/components/schemas/ListLinks' }
+
+    LocationBundleSummary:
+      type: object
+      required: [type, locationBundleId, href]
+      properties:
+        type: { const: Lokationsbuendel }
+        locationBundleId: { $ref: '#/components/schemas/LocationBundleId' }
+        href: { type: string, format: uri-reference }
+        changedAt: { type: string, format: date-time }
+        validFrom: { $ref: '#/components/schemas/DayBoundary' }
+        validTo:
+          oneOf:
+            - { $ref: '#/components/schemas/DayBoundary' }
+            - { type: "null" }
+          description: Ende der Gültigkeit; `null` bedeutet offen.
+
+    LocationBundle:
+      type: object
+      required: [type, locationBundleId, networkOperator, timeSlices]
+      properties:
+        type: { const: Lokationsbuendel }
+        locationBundleId: { $ref: '#/components/schemas/LocationBundleId' }
+        href: { type: string, format: uri-reference }
+        networkOperator:
+          $ref: '#/components/schemas/MarketPartnerRef'
+          description: Der für dieses Bündel verantwortliche Netzbetreiber.
+        changedAt: { type: string, format: date-time }
+        timeSlices:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/TimeSlice' }
+          description: |
+            Zeitscheiben in aufsteigender Reihenfolge von `validFrom`. Anders als in der
+            konsultierten Fassung trägt jede Zeitscheibe ein explizites `validTo`; ein
+            Sonderkonstrukt für das Ende der letzten Scheibe ist damit entbehrlich.
+
+    LocationBundleWrite:
+      type: object
+      required: [timeSlices]
+      properties:
+        timeSlices:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/TimeSliceWrite' }
+
+    TimeSliceDocument:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/TimeSlice' }
+        links:
+          type: object
+          properties:
+            self: { $ref: '#/components/schemas/Link' }
+            bundle: { $ref: '#/components/schemas/Link' }
+
+    TimeSliceList:
+      type: object
+      required: [data, links]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/TimeSlice' }
+        links: { $ref: '#/components/schemas/ListLinks' }
+
+    TimeSlice:
+      type: object
+      required: [validFrom, validTo, members]
+      properties:
+        href: { type: string, format: uri-reference }
+        validFrom:
+          $ref: '#/components/schemas/DayBoundary'
+          description: Erster Tag, an dem diese Zusammensetzung gilt.
+        validTo:
+          oneOf:
+            - { $ref: '#/components/schemas/DayBoundary' }
+            - { type: "null" }
+          description: |
+            Erster Tag, an dem diese Zusammensetzung **nicht mehr** gilt (exklusiv), oder
+            `null` für eine offene Zeitscheibe.
+
+            In der konsultierten Fassung existiert kein Ende-Feld. Das Ende ergibt sich
+            implizit aus dem Beginn der Folgescheibe, und das Ende der letzten Scheibe wird
+            über ein separates Feld auf Bündelebene ausgedrückt. Damit lassen sich
+            Lücken und Überlappungen im Schema nicht erkennen. Mit explizitem `validTo`
+            sind sie prüfbar.
+        members:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/BundleMember' }
+          description: Die Knoten des Bündels in dieser Zeitscheibe.
+        relations:
+          type: array
+          items: { $ref: '#/components/schemas/BundleRelation' }
+          description: |
+            Die gerichteten Kanten zwischen den Knoten. Zulässige Kombinationen von
+            Quell- und Zieltyp sind über `oneOf` im Schema festgelegt und damit
+            automatisiert prüfbar.
+
+    TimeSliceWrite:
+      type: object
+      required: [validFrom, validTo, members]
+      properties:
+        validFrom: { $ref: '#/components/schemas/DayBoundary' }
+        validTo:
+          oneOf:
+            - { $ref: '#/components/schemas/DayBoundary' }
+            - { type: "null" }
+        members:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/BundleMember' }
+        relations:
+          type: array
+          items: { $ref: '#/components/schemas/BundleRelation' }
+
+    # ---------- Knoten: tagged union ----------
+
+    BundleMember:
+      description: |
+        Ein Knoten des Lokationsbündels. Der Typ wird über das Feld `type` markiert
+        (tagged union). Damit ist für jeden Typ genau festgelegt, welche Felder zulässig
+        und welche erforderlich sind — Kombinationen, die es fachlich nicht gibt, sind
+        nicht darstellbar.
+
+        Dies ist der in Abschnitt 3.5 der Stellungnahme beschriebene Hebel: Bedingungen,
+        die heute als natürlichsprachliche Ad-hoc-Bedingungen im Anwendungshandbuch stehen
+        und von jedem Marktpartner eigenständig implementiert werden, wandern in das
+        Schema und werden von Standardwerkzeugen geprüft.
+      oneOf:
+        - { $ref: '#/components/schemas/NetworkLocationMember' }
+        - { $ref: '#/components/schemas/MeteringLocationMember' }
+        - { $ref: '#/components/schemas/MarketLocationMember' }
+        - { $ref: '#/components/schemas/TrancheMember' }
+        - { $ref: '#/components/schemas/TechnicalResourceMember' }
+        - { $ref: '#/components/schemas/ControllableResourceMember' }
+      discriminator:
+        propertyName: type
+        mapping:
+          Netzlokation: '#/components/schemas/NetworkLocationMember'
+          Messlokation: '#/components/schemas/MeteringLocationMember'
+          Marktlokation: '#/components/schemas/MarketLocationMember'
+          Tranche: '#/components/schemas/TrancheMember'
+          TechnischeRessource: '#/components/schemas/TechnicalResourceMember'
+          SteuerbareRessource: '#/components/schemas/ControllableResourceMember'
+
+    NetworkLocationMember:
+      type: object
+      required: [type, neloId]
+      additionalProperties: false
+      properties:
+        type: { const: Netzlokation }
+        neloId: { $ref: '#/components/schemas/NeloId' }
+        href: { type: string, format: uri-reference }
+
+    MeteringLocationMember:
+      type: object
+      required: [type, meloId, metering]
+      additionalProperties: false
+      properties:
+        type: { const: Messlokation }
+        meloId: { $ref: '#/components/schemas/MeloId' }
+        href: { type: string, format: uri-reference }
+        meteringPointOperator:
+          $ref: '#/components/schemas/MarketPartnerRef'
+        metering:
+          $ref: '#/components/schemas/Metering'
+
+    Metering:
+      description: |
+        Die Messung an einer Messlokation, als tagged union über die Art des Messsystems.
+
+        **Konkretes Beispiel für den Nutzen:** Bei einem intelligenten Messsystem ist die
+        Konfigurations-ID erforderlich; bei einem konventionellen Messsystem darf sie
+        nicht vorhanden sein; bei einer pauschalen Messlokation gibt es weder Zähler noch
+        OBIS-Kennzahlen noch Messwerte. Heute stehen diese drei Regeln als Bedingungen im
+        Anwendungshandbuch. Hier sind sie Teil des Schemas: Ein Payload, der einer
+        pauschalen Messlokation eine OBIS-Kennzahl zuordnet, ist schlicht nicht gültig und
+        wird von jedem Standardvalidator abgelehnt — nicht erst im Produktivbetrieb durch
+        einen Klärfall.
+      oneOf:
+        - { $ref: '#/components/schemas/IntelligentMeteringSystem' }
+        - { $ref: '#/components/schemas/ModernMeteringDevice' }
+        - { $ref: '#/components/schemas/FlatRateMetering' }
+      discriminator:
+        propertyName: type
+        mapping:
+          iMS: '#/components/schemas/IntelligentMeteringSystem'
+          mME: '#/components/schemas/ModernMeteringDevice'
+          pauschal: '#/components/schemas/FlatRateMetering'
+
+    IntelligentMeteringSystem:
+      type: object
+      required: [type, configurationId, obisCodes]
+      additionalProperties: false
+      properties:
+        type: { const: iMS }
+        configurationId:
+          type: string
+          description: Konfigurations-ID. Bei einem intelligenten Messsystem erforderlich.
+        obisCodes:
+          type: array
+          minItems: 1
+          items: { type: string }
+
+    ModernMeteringDevice:
+      type: object
+      required: [type, obisCodes]
+      additionalProperties: false
+      properties:
+        type: { const: mME }
+        obisCodes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        # configurationId ist hier nicht vorgesehen und damit nicht darstellbar.
+
+    FlatRateMetering:
+      type: object
+      required: [type]
+      additionalProperties: false
+      properties:
+        type: { const: pauschal }
+        description:
+          type: string
+          description: |
+            Pauschale Messlokation ohne Zähler. Trägt eine Zählpunktbezeichnung, aber
+            keine Messeinrichtung, keine OBIS-Kennzahlen und keine Messwerte.
+
+            Mitteilung Nr. 57 sieht vor, dass künftig jede Marktlokation Strom mindestens
+            eine zugeordnete Messlokation aufweist — entweder eine pauschale ohne Zähler
+            oder eine gemessene. Dieser Typ macht die Unterscheidung im Schema explizit,
+            statt sie einer Bedingung im Anwendungshandbuch zu überlassen.
+
+    MarketLocationMember:
+      type: object
+      required: [type, maloId]
+      additionalProperties: false
+      properties:
+        type: { const: Marktlokation }
+        maloId: { $ref: '#/components/schemas/MaloId' }
+        href: { type: string, format: uri-reference }
+        supplier: { $ref: '#/components/schemas/MarketPartnerRef' }
+        transmissionSystemOperator: { $ref: '#/components/schemas/MarketPartnerRef' }
+
+    TrancheMember:
+      type: object
+      required: [type, trancheId]
+      additionalProperties: false
+      description: |
+        Die Tranche als eigener Knotentyp.
+
+        In der konsultierten Fassung ist die Tranche kein eigenes Objekt, sondern eine
+        ID-Liste unter der Marktlokation, die den Datentyp der Marktlokations-ID
+        mitbenutzt. Ob eine gegebene elfstellige Ziffernfolge eine Marktlokation oder eine
+        Tranche bezeichnet, ergibt sich dort nur aus der Position im Dokument. Als eigener
+        Typ ist es eindeutig.
+      properties:
+        type: { const: Tranche }
+        trancheId: { $ref: '#/components/schemas/MaloId' }
+        href: { type: string, format: uri-reference }
+        supplier: { $ref: '#/components/schemas/MarketPartnerRef' }
+
+    TechnicalResourceMember:
+      type: object
+      required: [type, trId]
+      additionalProperties: false
+      properties:
+        type: { const: TechnischeRessource }
+        trId: { $ref: '#/components/schemas/TrId' }
+        href: { type: string, format: uri-reference }
+
+    ControllableResourceMember:
+      type: object
+      required: [type, srId]
+      additionalProperties: false
+      properties:
+        type: { const: SteuerbareRessource }
+        srId: { $ref: '#/components/schemas/SrId' }
+        href: { type: string, format: uri-reference }
+
+    # ---------- Kanten ----------
+
+    BundleRelation:
+      description: |
+        Eine gerichtete Kante zwischen zwei Knoten der Zeitscheibe. Quelle und Ziel werden
+        über ihre fachliche ID benannt.
+
+        Die zulässigen Typkombinationen sind hier abschließend als `oneOf` festgelegt.
+        Sie entsprechen den Zuordnungen der konsultierten Fassung:
+        Netzlokation → Messlokation, Messlokation → Messlokation,
+        Messlokation → Marktlokation, Messlokation → technische Ressource,
+        Marktlokation → technische Ressource, Marktlokation → Tranche.
+      oneOf:
+        - { $ref: '#/components/schemas/RelationNeloToMelo' }
+        - { $ref: '#/components/schemas/RelationMeloToMelo' }
+        - { $ref: '#/components/schemas/RelationMeloToMalo' }
+        - { $ref: '#/components/schemas/RelationMeloToTr' }
+        - { $ref: '#/components/schemas/RelationMaloToTr' }
+        - { $ref: '#/components/schemas/RelationMaloToTranche' }
+      discriminator:
+        propertyName: kind
+        mapping:
+          NetzlokationZuMesslokation: '#/components/schemas/RelationNeloToMelo'
+          MesslokationZuMesslokation: '#/components/schemas/RelationMeloToMelo'
+          MesslokationZuMarktlokation: '#/components/schemas/RelationMeloToMalo'
+          MesslokationZuTechnischerRessource: '#/components/schemas/RelationMeloToTr'
+          MarktlokationZuTechnischerRessource: '#/components/schemas/RelationMaloToTr'
+          MarktlokationZuTranche: '#/components/schemas/RelationMaloToTranche'
+
+    RelationNeloToMelo:
+      type: object
+      required: [kind, from, to]
+      additionalProperties: false
+      properties:
+        kind: { const: NetzlokationZuMesslokation }
+        from: { $ref: '#/components/schemas/NeloId' }
+        to: { $ref: '#/components/schemas/MeloId' }
+
+    RelationMeloToMelo:
+      type: object
+      required: [kind, from, to]
+      additionalProperties: false
+      properties:
+        kind: { const: MesslokationZuMesslokation }
+        from: { $ref: '#/components/schemas/MeloId' }
+        to: { $ref: '#/components/schemas/MeloId' }
+
+    RelationMeloToMalo:
+      type: object
+      required: [kind, from, to]
+      additionalProperties: false
+      properties:
+        kind: { const: MesslokationZuMarktlokation }
+        from: { $ref: '#/components/schemas/MeloId' }
+        to: { $ref: '#/components/schemas/MaloId' }
+
+    RelationMeloToTr:
+      type: object
+      required: [kind, from, to]
+      additionalProperties: false
+      properties:
+        kind: { const: MesslokationZuTechnischerRessource }
+        from: { $ref: '#/components/schemas/MeloId' }
+        to: { $ref: '#/components/schemas/TrId' }
+
+    RelationMaloToTr:
+      type: object
+      required: [kind, from, to]
+      additionalProperties: false
+      properties:
+        kind: { const: MarktlokationZuTechnischerRessource }
+        from: { $ref: '#/components/schemas/MaloId' }
+        to: { $ref: '#/components/schemas/TrId' }
+
+    RelationMaloToTranche:
+      type: object
+      required: [kind, from, to]
+      additionalProperties: false
+      properties:
+        kind: { const: MarktlokationZuTranche }
+        from: { $ref: '#/components/schemas/MaloId' }
+        to: { $ref: '#/components/schemas/MaloId' }
+
+    # ---------- Lokations-Einzelressourcen ----------
+
+    MarketPartnerRef:
+      type: object
+      required: [marketPartnerId]
+      properties:
+        marketPartnerId: { $ref: '#/components/schemas/MarketPartnerId' }
+        role:
+          type: string
+          enum: [NB, LF, MSB, MWV, UENB]
+        href: { type: string, format: uri-reference }
+
+    NetworkLocationDocument:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [type, neloId]
+          properties:
+            type: { const: Netzlokation }
+            neloId: { $ref: '#/components/schemas/NeloId' }
+            href: { type: string, format: uri-reference }
+            networkOperator: { $ref: '#/components/schemas/MarketPartnerRef' }
+        links:
+          type: object
+          properties:
+            self: { $ref: '#/components/schemas/Link' }
+            locationBundles: { $ref: '#/components/schemas/Link' }
+
+    MarketLocationDocument:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [type, maloId]
+          properties:
+            type:
+              type: string
+              enum: [Marktlokation, Tranche]
+            maloId: { $ref: '#/components/schemas/MaloId' }
+            href: { type: string, format: uri-reference }
+            supplier: { $ref: '#/components/schemas/MarketPartnerRef' }
+        links:
+          type: object
+          properties:
+            self: { $ref: '#/components/schemas/Link' }
+            locationBundles: { $ref: '#/components/schemas/Link' }
+
+    MeteringLocationDocument:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [type, meloId, metering]
+          properties:
+            type: { const: Messlokation }
+            meloId: { $ref: '#/components/schemas/MeloId' }
+            href: { type: string, format: uri-reference }
+            meteringPointOperator: { $ref: '#/components/schemas/MarketPartnerRef' }
+            metering: { $ref: '#/components/schemas/Metering' }
+        links:
+          type: object
+          properties:
+            self: { $ref: '#/components/schemas/Link' }
+            locationBundles: { $ref: '#/components/schemas/Link' }
+
+    # ---------- Clearing ----------
+
+    ClearingState:
+      type: string
+      enum: [offen, inBearbeitung, beigelegt, zurueckgewiesen, zurueckgezogen]
+      description: |
+        Zustand des Clearing-Falls. Dass es diesen Zustand überhaupt gibt, ist der
+        wesentliche Unterschied zur konsultierten Fassung: Dort ist das Clearing ein
+        Aufruf ohne Vorgangsreferenz, ohne Antwortkanal und ohne definierten Endzustand.
+
+    ClearingCaseDocument:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/ClearingCase' }
+        links:
+          type: object
+          properties:
+            self: { $ref: '#/components/schemas/Link' }
+            bundle: { $ref: '#/components/schemas/Link' }
+
+    ClearingCaseList:
+      type: object
+      required: [data, links]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ClearingCase' }
+        links: { $ref: '#/components/schemas/ListLinks' }
+
+    ClearingCase:
+      type: object
+      required: [type, clearingCaseId, state, openedBy, openedAt, subject]
+      properties:
+        type: { const: ClearingFall }
+        clearingCaseId: { type: string, format: uuid }
+        href: { type: string, format: uri-reference }
+        state: { $ref: '#/components/schemas/ClearingState' }
+        openedBy: { $ref: '#/components/schemas/MarketPartnerRef' }
+        openedAt: { type: string, format: date-time }
+        dueAt:
+          type: string
+          format: date-time
+          description: Frist, bis zu der der Verantwortliche zu reagieren hat.
+        subject:
+          type: object
+          required: [locationBundle]
+          description: Gegenstand des Falls.
+          properties:
+            locationBundle: { $ref: '#/components/schemas/Link' }
+            timeSlice:
+              allOf: [{ $ref: '#/components/schemas/Link' }]
+              description: Betroffene Zeitscheibe, sofern der Fall auf eine begrenzt ist.
+        observed:
+          allOf: [{ $ref: '#/components/schemas/TimeSliceWrite' }]
+          description: |
+            Der Stand, den der Eröffner beim Verantwortlichen vorgefunden hat — als Beleg
+            dafür, worauf sich der Fall bezieht.
+        expected:
+          allOf: [{ $ref: '#/components/schemas/TimeSliceWrite' }]
+          description: Der Stand, den der Eröffner erwartet.
+        reason:
+          type: string
+          description: Begründung des Eröffners.
+        resolution: { $ref: '#/components/schemas/ClearingResolution' }
+
+    ClearingCaseWrite:
+      type: object
+      required: [expected, reason]
+      properties:
+        timeSlice:
+          type: string
+          format: date
+          description: Beginn der betroffenen Zeitscheibe.
+        observedETag:
+          type: string
+          description: |
+            `ETag` des Stands, auf den sich der Fall bezieht. Damit ist eindeutig, welchen
+            Stand der Eröffner gesehen hat — auch wenn der Verantwortliche zwischenzeitlich
+            geändert hat.
+        expected: { $ref: '#/components/schemas/TimeSliceWrite' }
+        reason: { type: string }
+
+    ClearingCasePatch:
+      type: object
+      properties:
+        state: { $ref: '#/components/schemas/ClearingState' }
+        resolution: { $ref: '#/components/schemas/ClearingResolution' }
+
+    ClearingResolution:
+      type: object
+      required: [decisionTree, responseCode]
+      description: |
+        Der Abschluss des Falls. `decisionTree` und `responseCode` sind unverändert aus der
+        bestehenden Regulierung übernommen — die Entscheidungsbaumdiagramme und ihre
+        Antwortcodes bleiben gültig und werden hier lediglich an einer Ressource mit
+        Zustand geführt statt in einem Aufruf ohne Rückbezug.
+      properties:
+        decisionTree:
+          type: string
+          pattern: '^E_\d{4}$'
+          examples: ["E_0594"]
+        responseCode:
+          type: string
+          pattern: '^A[A-Z\d]{2}$'
+          examples: ["A10"]
+        reason:
+          type: string
+          description: |
+            Freitext. Nur anzugeben, wenn der Antwortcode des Entscheidungsbaumdiagramms
+            dies vorsieht.
+        correctedBundle:
+          allOf: [{ $ref: '#/components/schemas/Link' }]
+          description: |
+            Bei `beigelegt`: Verweis auf den korrigierten Stand. Der Eröffner kann ihn
+            unmittelbar abrufen und prüfen — er muss nicht auf eine gesonderte
+            Übermittlung warten.
+        resolvedAt: { type: string, format: date-time }
+
+    # ---------- Netzbetreiberwechsel ----------
+
+    NetworkOperatorChangeRequest:
+      type: object
+      required: [locationBundleId, effectiveFrom]
+      properties:
+        locationBundleId: { $ref: '#/components/schemas/LocationBundleId' }
+        effectiveFrom: { $ref: '#/components/schemas/DayBoundary' }
+        successorNetworkOperator: { $ref: '#/components/schemas/MarketPartnerRef' }
+
+    PendingResult:
+      type: object
+      required: [status]
+      properties:
+        status: { const: inArbeit }
+        expectedAvailableAt:
+          type: string
+          format: date-time
+          description: Voraussichtlicher Zeitpunkt der Bereitstellung.
+
+    NetworkOperatorChangePackageDocument:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/NetworkOperatorChangePackage' }
+        links:
+          type: object
+          properties:
+            self: { $ref: '#/components/schemas/Link' }
+            locationBundle: { $ref: '#/components/schemas/Link' }
+
+    NetworkOperatorChangePackage:
+      type: object
+      required: [type, packageId, effectiveFrom, locationBundle, assignments]
+      properties:
+        type: { const: NetzbetreiberwechselPaket }
+        packageId: { $ref: '#/components/schemas/NetworkOperatorChangePackageId' }
+        href: { type: string, format: uri-reference }
+        effectiveFrom: { $ref: '#/components/schemas/DayBoundary' }
+        locationBundle:
+          $ref: '#/components/schemas/Link'
+          description: |
+            Verweis auf das Bündel statt Einbettung einer Kopie.
+
+            In der konsultierten Fassung wird das vollständige Lokationsbündel in das
+            Wechselpaket eingebettet. Damit existieren zwei Kopien desselben Sachverhalts,
+            die auseinanderlaufen können — und das Paket mischt zwei Zeitmodelle, weil das
+            eingebettete Bündel Zeitscheiben trägt, die Marktpartnerzuordnung des Pakets
+            aber ausdrücklich nicht.
+        assignments:
+          type: array
+          description: |
+            Die Marktpartnerzuordnung zum Wechselzeitpunkt. Als einheitliche Liste über
+            alle Objekttypen statt fünf paralleler, gleichartiger Arrays.
+          items: { $ref: '#/components/schemas/OperatorAssignment' }
+
+    OperatorAssignment:
+      type: object
+      required: [objectType, objectId]
+      properties:
+        objectType:
+          type: string
+          enum: [Netzlokation, Messlokation, Marktlokation, Tranche, SteuerbareRessource]
+        objectId: { type: string }
+        href: { type: string, format: uri-reference }
+        meteringPointOperator: { $ref: '#/components/schemas/MarketPartnerRef' }
+        supplier: { $ref: '#/components/schemas/MarketPartnerRef' }
+        transmissionSystemOperator: { $ref: '#/components/schemas/MarketPartnerRef' }
+
+    # ---------- Benachrichtigung ----------
+
+    SubscriptionWrite:
+      type: object
+      required: [callbackUrl, eventTypes]
+      properties:
+        callbackUrl:
+          type: string
+          format: uri
+          description: Endpunkt des Abonnenten, an den Ereignisse zugestellt werden.
+        eventTypes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum:
+              - locationBundleChanged
+              - clearingCaseOpened
+              - clearingCaseResolved
+              - subscriptionRevoked
+        filter:
+          type: object
+          description: Optionale Einschränkung auf bestimmte Lokationen.
+          properties:
+            marketLocations:
+              type: array
+              items: { $ref: '#/components/schemas/MaloId' }
+            networkLocations:
+              type: array
+              items: { $ref: '#/components/schemas/NeloId' }
+
+    SubscriptionDocument:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Subscription' }
+        links:
+          type: object
+          properties:
+            self: { $ref: '#/components/schemas/Link' }
+
+    SubscriptionList:
+      type: object
+      required: [data, links]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Subscription' }
+        links: { $ref: '#/components/schemas/ListLinks' }
+
+    Subscription:
+      type: object
+      required: [type, subscriptionId, callbackUrl, eventTypes, state]
+      properties:
+        type: { const: Abonnement }
+        subscriptionId: { type: string, format: uuid }
+        href: { type: string, format: uri-reference }
+        callbackUrl: { type: string, format: uri }
+        eventTypes:
+          type: array
+          items: { type: string }
+        state:
+          type: string
+          enum: [aktiv, ausgesetzt, beendet]
+        createdAt: { type: string, format: date-time }
+
+    ChangeEvent:
+      type: object
+      required: [type, eventId, occurredAt, resource]
+      description: |
+        Das Änderungsereignis trägt bewusst **keine** Fachdaten. Es informiert darüber,
+        dass etwas vorliegt, und nennt die URL. Der Abonnent ruft die Daten zu einem für
+        ihn passenden Zeitpunkt und in der von ihm benötigten Granularität ab.
+
+        Damit steigt die Wahrscheinlichkeit, dass die Daten zum Zeitpunkt ihrer
+        tatsächlichen Nutzung aktuell sind — und der Benachrichtigungsdienst kann auf
+        seine Kernaufgabe zugeschnitten werden, statt eine 1:N-Verteilung über eine
+        Punkt-zu-Punkt-Architektur nachzubilden.
+      properties:
+        type:
+          type: string
+          enum:
+            - locationBundleChanged
+            - clearingCaseOpened
+            - clearingCaseResolved
+            - subscriptionRevoked
+        eventId: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        resource:
+          $ref: '#/components/schemas/Link'
+          description: URL der betroffenen Ressource.
+        etag:
+          type: string
+          description: |
+            `ETag` des neuen Stands. Ein Abonnent, der diesen Stand bereits kennt, kann den
+            Abruf überspringen.
+
+    # ---------- Betrieb ----------
+
+    ImplementationStatus:
+      type: object
+      required: [semesterRelease, endpoints]
+      properties:
+        semesterRelease:
+          type: string
+          description: Aktuell verpflichtendes Semester-Release.
+          examples: ["2026-2"]
+        preReleaseVersion:
+          type: string
+          description: Angebotene Vorweg-Version, sofern vorhanden.
+          examples: ["2026-2.5"]
+        endpoints:
+          type: array
+          items:
+            type: object
+            required: [operationId, state]
+            properties:
+              operationId: { type: string }
+              state:
+                type: string
+                enum: [vollstaendig, teilweise, nichtImplementiert]
+              note: { type: string }
+
+    # ---------- Fehler ----------
+
+    Problem:
+      type: object
+      description: |
+        Fehlermeldung nach RFC 9457 (Problem Details for HTTP APIs).
+
+        Die konsultierte Fassung definiert für keine Operation einen Response-Body — auch
+        nicht für `400` und `422`. Ein Empfänger kann einen Validierungsfehler dort nicht
+        maschinenlesbar zurückmelden; inhaltliche Fehler müssen den Umweg über einen
+        neuen Aufruf in Gegenrichtung nehmen.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          examples: ["tag:edi-energy.de:api:error:validation"]
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri-reference }
+        errors:
+          type: array
+          description: Einzelne Verstöße mit Fundstelle.
+          items:
+            type: object
+            required: [pointer, message]
+            properties:
+              pointer:
+                type: string
+                description: JSON-Pointer nach RFC 6901 auf die betroffene Stelle.
+                examples: ["/timeSlices/0/members/2/metering/configurationId"]
+              message: { type: string }
+              code: { type: string }

@@ -1,0 +1,27 @@
+{
+  "_beschreibung": "NEGATIVBEISPIEL — dieser Payload MUSS abgelehnt werden. Er enthält eine Kante von einer Netzlokation direkt auf eine Marktlokation. Diese Zuordnung ist im Datenmodell nicht vorgesehen: Marktlokationen hängen an Messlokationen, nicht an Netzlokationen. Der abschließende Katalog zulässiger Kantentypen im Schema macht die Regel automatisiert prüfbar — sie muss nicht von jedem Marktpartner aus dem Anwendungshandbuch heraus eigenständig implementiert werden.",
+  "_erwartet": "ungueltig",
+  "data": {
+    "type": "Lokationsbuendel",
+    "locationBundleId": "FZZ00000002",
+    "networkOperator": { "marketPartnerId": "9900987654321", "role": "NB" },
+    "timeSlices": [
+      {
+        "validFrom": "2027-10-01",
+        "validTo": null,
+        "members": [
+          { "type": "Netzlokation", "neloId": "EZZ00000002" },
+          {
+            "type": "Messlokation",
+            "meloId": "DE00014545768S0000000000000003054",
+            "metering": { "type": "mME", "obisCodes": ["1-0:1.8.0"] }
+          },
+          { "type": "Marktlokation", "maloId": "57685676748" }
+        ],
+        "relations": [
+          { "kind": "NetzlokationZuMarktlokation", "from": "EZZ00000002", "to": "57685676748" }
+        ]
+      }
+    ]
+  }
+}
