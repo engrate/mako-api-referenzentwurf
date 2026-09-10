@@ -1,0 +1,225 @@
+---
+title: "Typisierung"
+description: "Fachliche Bedingungen als oneOf und discriminator im Schema, statt als Prosa im Anwendungshandbuch."
+---
+
+Dies ist der Hebel, den Abschnitt 3.5 der Stellungnahme beschreibt: Bedingungen, die heute
+als natürlichsprachliche Ad-hoc-Bedingungen im Anwendungshandbuch stehen und von jedem
+Marktpartner eigenständig implementiert werden, wandern in das Schema und werden von
+Standardwerkzeugen geprüft.
+
+<Columns cols={2}>
+  <Card title="Konsultiert" icon="file-lines" horizontal>
+    **1** `oneOf`, **0** `discriminator`, **0** Schemas mit `additionalProperties: false`.
+    Die Bedingung steht als Satz im Anwendungshandbuch. Jeder Marktpartner implementiert sie
+    selbst. Ein Verstoß fällt im Produktivbetrieb auf — als Klärfall.
+  </Card>
+  <Card title="Referenzentwurf" icon="shield-check" horizontal>
+    **9** `oneOf`, **3** `discriminator`, `additionalProperties: false` auf allen Knoten- und
+    Kantentypen. Jeder Standardvalidator lehnt einen Verstoß zur Entwurfszeit ab, mit
+    JSON-Pointer auf die Fundstelle.
+  </Card>
+</Columns>
+
+## Drei tagged unions
+
+| Union | Diskriminator | Varianten |
+|---|---|---|
+| `BundleMember` | `type` | `Netzlokation`, `Messlokation`, `Marktlokation`, `Tranche`, `TechnischeRessource`, `SteuerbareRessource` |
+| `Metering` | `type` | `iMS`, `mME`, `pauschal` |
+| `BundleRelation` | `kind` | sechs zulässige Quell-Ziel-Kombinationen |
+
+Eine tagged union legt für **jeden** Typ abschließend fest, welche Felder zulässig und
+welche erforderlich sind. Kombinationen, die es fachlich nicht gibt, sind nicht darstellbar —
+nicht „unerwünscht", sondern im Datenformat nicht ausdrückbar.
+
+## Das Lehrbeispiel: die Messung
+
+Drei Arten von Messung, drei unterschiedliche Regeln. Heute stehen sie als Bedingungen im
+Anwendungshandbuch.
+
+<Tabs>
+  <Tab title="iMS">
+    Intelligentes Messsystem. Konfigurations-ID **erforderlich**.
+
+    ```yaml
+    IntelligentMeteringSystem:
+      type: object
+      required: [type, configurationId, obisCodes]
+      additionalProperties: false
+      properties:
+        type: { const: iMS }
+        configurationId: { type: string }
+        obisCodes:
+          type: array
+          minItems: 1
+          items: { type: string }
+    ```
+
+    ```json
+    {
+      "type": "iMS",
+      "configurationId": "K-2027-1000",
+      "obisCodes": ["1-0:1.8.0", "1-0:2.8.0"]
+    }
+    ```
+  </Tab>
+  <Tab title="mME">
+    Moderne Messeinrichtung. Konfigurations-ID **nicht vorgesehen** — und damit nicht
+    darstellbar, weil `additionalProperties: false` gilt.
+
+    ```yaml
+    ModernMeteringDevice:
+      type: object
+      required: [type, obisCodes]
+      additionalProperties: false
+      properties:
+        type: { const: mME }
+        obisCodes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        # configurationId ist hier nicht vorgesehen und damit nicht darstellbar.
+    ```
+
+    ```json
+    { "type": "mME", "obisCodes": ["1-0:1.8.0"] }
+    ```
+  </Tab>
+  <Tab title="pauschal">
+    Pauschale Messlokation. **Weder** Zähler **noch** OBIS-Kennzahlen **noch** Messwerte —
+    nur eine Zählpunktbezeichnung und optional eine Beschreibung.
+
+    ```yaml
+    FlatRateMetering:
+      type: object
+      required: [type]
+      additionalProperties: false
+      properties:
+        type: { const: pauschal }
+        description: { type: string }
+    ```
+
+    ```json
+    {
+      "type": "pauschal",
+      "description": "Straßenbeleuchtung, pauschal abgerechnet, keine Messeinrichtung"
+    }
+    ```
+
+    Mitteilung Nr. 57 sieht vor, dass künftig jede Marktlokation Strom mindestens eine
+    zugeordnete Messlokation aufweist — bei zählerlosen Marktlokationen eine pauschale ohne
+    Messeinrichtung. Dieser Typ macht die Unterscheidung im Schema explizit.
+  </Tab>
+</Tabs>
+
+Der Diskriminator verbindet sie:
+
+```yaml
+Metering:
+  oneOf:
+    - { $ref: '#/components/schemas/IntelligentMeteringSystem' }
+    - { $ref: '#/components/schemas/ModernMeteringDevice' }
+    - { $ref: '#/components/schemas/FlatRateMetering' }
+  discriminator:
+    propertyName: type
+    mapping:
+      iMS:      '#/components/schemas/IntelligentMeteringSystem'
+      mME:      '#/components/schemas/ModernMeteringDevice'
+      pauschal: '#/components/schemas/FlatRateMetering'
+```
+
+## Der Nachweis
+
+Ein Payload, der einer pauschalen Messlokation eine Konfigurations-ID und eine OBIS-Kennzahl
+zuordnet, ist fachlich unmöglich — eine pauschale Messlokation hat keine Messeinrichtung.
+
+```json examples/04-UNGUELTIG-pauschal-mit-obis.json (Auszug)
+{
+  "type": "Messlokation",
+  "meloId": "DE00014545768S0000000000000003054",
+  "metering": {
+    "type": "pauschal",
+    "configurationId": "K-2027-9999",
+    "obisCodes": ["1-0:1.8.0"]
+  }
+}
+```
+
+<Columns cols={2}>
+  <Card title="In der konsultierten Fassung" icon="circle-check" horizontal>
+    **Schemagültig.** Die Unterscheidung zwischen pauschaler und gemessener Messlokation ist
+    dort nicht modelliert. Der Fehler fällt im Produktivbetrieb auf — als Klärfall.
+  </Card>
+  <Card title="Im Referenzentwurf" icon="circle-xmark" horizontal>
+    **Abgelehnt** bei `/data/timeSlices/0/members/1`, zur Entwurfszeit, von jedem
+    Standardvalidator. Das Prüfwerkzeug des Repositorys schlägt fehl, wenn dieser Payload
+    jemals akzeptiert würde.
+  </Card>
+</Columns>
+
+## Kanten: ein abschließender Katalog
+
+Dasselbe Prinzip für die Zuordnungen. Der Katalog zulässiger Quell-Ziel-Kombinationen ist
+abschließend:
+
+```yaml
+BundleRelation:
+  oneOf:
+    - { $ref: '#/components/schemas/RelationNeloToMelo' }
+    - { $ref: '#/components/schemas/RelationMeloToMelo' }
+    - { $ref: '#/components/schemas/RelationMeloToMalo' }
+    - { $ref: '#/components/schemas/RelationMeloToTr' }
+    - { $ref: '#/components/schemas/RelationMaloToTr' }
+    - { $ref: '#/components/schemas/RelationMaloToTranche' }
+  discriminator:
+    propertyName: kind
+```
+
+Eine Kante von einer Netzlokation direkt auf eine Marktlokation gibt es nicht — im
+Datenmodell hängen Marktlokationen an Messlokationen. Das Negativbeispiel
+`05-UNGUELTIG-unzulaessige-kante.json` wird bei `/data/timeSlices/0/relations/0` abgelehnt.
+
+<Tip>
+  Dies beantwortet zugleich einen Antrag aus der Stellungnahme: Der dort geforderte Katalog
+  fachlicher Validierungsregeln für Lokationsbündel **muss nicht** als Prosa im
+  Anwendungshandbuch stehen. Er kann Teil des Schemas sein und ist dann automatisiert
+  prüfbar.
+</Tip>
+
+## Was die Typisierung nicht leistet
+
+<Warning>
+  JSON Schema kann Beziehungen zwischen Array-Elementen nicht ausdrücken. Nicht im Schema
+  prüfbar sind deshalb etwa:
+
+  - ob jede in `relations` genannte ID auch als Knoten in `members` vorkommt,
+  - ob die Zeitscheiben lückenlos und nicht überlappend aneinandergrenzen,
+  - ob der Graph zusammenhängend ist.
+
+  Diese Regeln bleiben Aufgabe der Anwendungslogik. Der Entwurf behauptet nicht, alle
+  fachlichen Bedingungen ins Schema verlagern zu können — nur die, bei denen es geht. Das
+  sind die, die heute den überwiegenden Teil der vermeidbaren Klärfälle verursachen.
+</Warning>
+
+## Warum OpenAPI 3.1
+
+Die konsultierte Fassung verwendet OpenAPI 3.0.0. Dieser Entwurf verwendet 3.1.0, aus zwei
+Gründen:
+
+<AccordionGroup>
+  <Accordion title="Geschwisterfelder neben $ref sind gültig" icon="code-branch">
+    In OpenAPI 3.0 ersetzt `$ref` das gesamte Objekt — eine `description` daneben wird von
+    jedem konformen Generator und Renderer verworfen. In der konsultierten Fassung steht
+    praktisch jede fachliche `description` im Datenmodell neben einem `$ref`; die fachliche
+    Dokumentation der Felder ist damit faktisch nicht Teil der Spezifikation. In 3.1 ist
+    dieselbe Schreibweise gültig. Siehe [Befunde](/gegenueberstellung/befunde).
+  </Accordion>
+  <Accordion title="Vollständige JSON-Schema-Kompatibilität" icon="brackets-curly">
+    OpenAPI 3.1 ist ein echtes Superset von JSON Schema Draft 2020-12. Dadurch lässt sich
+    jedes Schema unmittelbar mit Standardvalidatoren prüfen — genau das, was
+    `tools/validate.py` tut, mit `jsonschema` und ohne eigene Interpretationsschicht.
+    Zusätzlich wird `type: "null"` als Union-Mitglied ausdrückbar, was `validTo: null`
+    überhaupt erst saubere Modellierung erlaubt.
+  </Accordion>
+</AccordionGroup>

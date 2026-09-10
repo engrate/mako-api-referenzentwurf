@@ -1,0 +1,246 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "MaKo-API Referenzentwurf",
+  "description": "Ressourcenorientierter Referenzentwurf für den MaKo-Webdienst Lokationsbündel. Konsultationsbeitrag zu Mitteilung Nr. 57 der Bundesnetzagentur.",
+  "colors": {
+    "primary": "#0F766E",
+    "light": "#2DD4BF",
+    "dark": "#115E59"
+  },
+  "favicon": "/images/favicon.svg",
+  "logo": {
+    "light": "/images/logo-hell.svg",
+    "dark": "/images/logo-dunkel.svg",
+    "href": "/"
+  },
+  "banner": {
+    "content": "**Kein offizielles Dokument** der Bundesnetzagentur, des BDEW oder der Projektgruppe EDI@Energy — Konsultationsbeitrag eines Marktteilnehmers.",
+    "dismissible": false
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Dokumentation",
+        "groups": [
+          {
+            "group": "Einstieg",
+            "icon": "compass",
+            "pages": [
+              "index",
+              "einstieg/worum-es-geht",
+              "einstieg/schnellstart"
+            ]
+          },
+          {
+            "group": "Architektur",
+            "icon": "sitemap",
+            "pages": [
+              "architektur/ressourcenmodell",
+              "architektur/datenmodell",
+              "architektur/zeitscheiben",
+              "architektur/typisierung",
+              "architektur/nebenlaeufigkeit",
+              "architektur/fehlerbehandlung",
+              "architektur/sicherheit",
+              "architektur/betrieb"
+            ]
+          },
+          {
+            "group": "Abläufe",
+            "icon": "route",
+            "pages": [
+              "ablaeufe/stand-pruefen",
+              "ablaeufe/aenderung-verteilen",
+              "ablaeufe/clearing",
+              "ablaeufe/neuer-berechtigter",
+              "ablaeufe/netzbetreiberwechsel"
+            ]
+          },
+          {
+            "group": "Gegenüberstellung",
+            "icon": "scale-balanced",
+            "pages": [
+              "gegenueberstellung/spezifikationsvergleich",
+              "gegenueberstellung/befunde",
+              "gegenueberstellung/einwaende"
+            ]
+          },
+          {
+            "group": "Referenz",
+            "icon": "book",
+            "pages": [
+              "referenz/beispiele",
+              "referenz/pruefwerkzeug",
+              "referenz/unveraendert",
+              "referenz/konsultationsbezug"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API-Referenz",
+        "icon": "code",
+        "openapi": "openapi/netzbetreiber-api.yaml",
+        "groups": [
+          {
+            "group": "Überblick",
+            "icon": "compass",
+            "pages": [
+              "api-referenz/einfuehrung",
+              "api-referenz/konventionen"
+            ]
+          },
+          {
+            "group": "Lokationsbündel",
+            "icon": "layer-group",
+            "pages": [
+              "GET /location-bundles",
+              "GET /location-bundles/{locationBundleId}",
+              "PUT /location-bundles/{locationBundleId}",
+              "PATCH /location-bundles/{locationBundleId}",
+              "GET /location-bundles/{locationBundleId}/time-slices",
+              "GET /location-bundles/{locationBundleId}/time-slices/{validFrom}",
+              "PUT /location-bundles/{locationBundleId}/time-slices/{validFrom}",
+              "DELETE /location-bundles/{locationBundleId}/time-slices/{validFrom}"
+            ]
+          },
+          {
+            "group": "Lokationen",
+            "icon": "location-dot",
+            "pages": [
+              "GET /network-locations/{neloId}",
+              "GET /market-locations/{maloId}",
+              "GET /metering-locations/{meloId}"
+            ]
+          },
+          {
+            "group": "Clearing",
+            "icon": "gavel",
+            "pages": [
+              "GET /location-bundles/{locationBundleId}/clearing-cases",
+              "POST /location-bundles/{locationBundleId}/clearing-cases",
+              "GET /clearing-cases/{clearingCaseId}",
+              "PATCH /clearing-cases/{clearingCaseId}"
+            ]
+          },
+          {
+            "group": "Netzbetreiberwechsel",
+            "icon": "arrow-right-arrow-left",
+            "pages": [
+              "POST /network-operator-change-packages",
+              "GET /network-operator-change-packages/{packageId}"
+            ]
+          },
+          {
+            "group": "Benachrichtigung",
+            "icon": "bell",
+            "pages": [
+              "GET /subscriptions",
+              "POST /subscriptions",
+              "GET /subscriptions/{subscriptionId}",
+              "DELETE /subscriptions/{subscriptionId}"
+            ]
+          },
+          {
+            "group": "Betrieb",
+            "icon": "gear",
+            "pages": [
+              "GET /versions"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Repository",
+          "icon": "github",
+          "href": "https://github.com/engrate/mako-api-referenzentwurf"
+        },
+        {
+          "anchor": "Gegenüberstellung (PDF)",
+          "icon": "file-pdf",
+          "href": "https://github.com/engrate/mako-api-referenzentwurf/blob/main/Gegenueberstellung.pdf"
+        }
+      ]
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "OpenAPI-Datei",
+        "href": "https://github.com/engrate/mako-api-referenzentwurf/blob/main/openapi/netzbetreiber-api.yaml"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/engrate/mako-api-referenzentwurf"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/engrate/mako-api-referenzentwurf",
+      "website": "https://engrate.io"
+    },
+    "links": [
+      {
+        "header": "Entwurf",
+        "items": [
+          {
+            "label": "Übersicht",
+            "href": "/"
+          },
+          {
+            "label": "API-Referenz",
+            "href": "/api-referenz/einfuehrung"
+          },
+          {
+            "label": "Beispiele",
+            "href": "/referenz/beispiele"
+          }
+        ]
+      },
+      {
+        "header": "Konsultation",
+        "items": [
+          {
+            "label": "Gegenüberstellung",
+            "href": "/gegenueberstellung/spezifikationsvergleich"
+          },
+          {
+            "label": "Antizipierte Einwände",
+            "href": "/gegenueberstellung/einwaende"
+          },
+          {
+            "label": "Bezug zur Konsultation",
+            "href": "/referenz/konsultationsbezug"
+          }
+        ]
+      },
+      {
+        "header": "Rechtliches",
+        "items": [
+          {
+            "label": "Lizenz CC0-1.0",
+            "href": "https://github.com/engrate/mako-api-referenzentwurf/blob/main/LICENSE"
+          }
+        ]
+      }
+    ]
+  },
+  "seo": {
+    "metatags": {
+      "og:site_name": "MaKo-API Referenzentwurf",
+      "og:locale": "de_DE"
+    },
+    "indexing": "all"
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view"
+    ]
+  }
+}

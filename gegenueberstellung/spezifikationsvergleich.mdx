@@ -1,0 +1,98 @@
+---
+title: "Spezifikationsvergleich"
+description: "Ausgezählte Unterschiede beider Spezifikationsdateien und die Zusammenfassung des Ablaufvergleichs."
+---
+
+Die folgenden Angaben sind aus den Spezifikationsdateien **ausgezählt, nicht geschätzt**.
+Stand der Auswertung: 21.08.2026.
+
+| | |
+|:---|:---|
+| Konsultierte Fassung | `api/masterData/locationBundleV1.yaml`, Branch `2026-07-31-consultation`, Repository `EDI-Energy/api-electricity` |
+| Referenzentwurf | `openapi/netzbetreiber-api.yaml`, Tag `konsultation-2026-08` |
+| Fachlicher Umfang | identisch — Übermittlung, Antwort, Clearing und Netzbetreiberwechsel von Lokationsbündeln |
+
+## Die Spezifikationen im Vergleich
+
+| Merkmal | Konsultierte Fassung | Referenzentwurf |
+|:---|:---|:---|
+| OpenAPI-Version | 3.0.0 | 3.1.0 |
+| Pfade | 4 | 14 |
+| Operationen | 4 | 22 |
+| HTTP-Verben | nur `POST` | `GET` 13, `PUT` 2, `POST` 3, `PATCH` 2, `DELETE` 2 |
+| Leseoperationen | 0 | 13 |
+| `operationId` vergeben | 0 von 4 | 22 von 22 |
+| Response-Bodies definiert | 0 (auch nicht für `400`/`422`) | für alle Operationen |
+| Fehlerformat | nicht definiert | RFC 9457 Problem Details mit JSON-Pointer |
+| `securitySchemes` | nicht vorhanden | OAuth 2.0 mit Scopes, mTLS als Alternative |
+| `servers` | nicht vorhanden | mit Variablenmuster für die Verzeichnisdienstauflösung |
+| `oneOf` / `discriminator` | 1 / 0 | 9 / 3 |
+| `additionalProperties: false` | 0 Schemas | alle Knoten- und Kantentypen |
+| Zeitscheiben-Ende | kein Feld — implizit | `validTo` explizit, `null` für offen |
+| Paginierung / Filterung / Sortierung | nicht vorhanden | auf allen Listenressourcen |
+| Nebenläufigkeitsschutz | nicht vorhanden | `ETag` / `If-Match` |
+| Zwischenspeicherbarkeit | nicht möglich | `ETag`, `Cache-Control`, `Last-Modified`, `304` |
+| Abkündigung | Freitext | `Deprecation` / `Sunset` nach RFC 8594 |
+| Umsetzungsstand abfragbar | nein | `GET /versions` |
+| Duplizierte Schemas | 4 (Clearing-Kopien) | 0 |
+| Reine Array-Wrapper-Dateien | 20 von 59 | 0 |
+
+<Note>
+  Die Kennzahlen des Referenzentwurfs werden bei jedem Lauf von
+  [`tools/validate.py`](/referenz/pruefwerkzeug) neu ausgezählt, nicht eingetragen. Wer sie
+  nachprüfen will, braucht zwei Befehle.
+</Note>
+
+## Vier Geschäftsvorfälle im Ablaufvergleich
+
+Angenommene Konstellation: ein Lokationsbündel mit drei Berechtigten — Lieferant,
+Messstellenbetreiber, Messwertverarbeiter — und dem verantwortlichen Netzbetreiber.
+
+| Vorfall | Konsultiert | Referenzentwurf | Wesentlicher Unterschied |
+|:---|:---|:---|:---|
+| [A — Stand prüfen](/ablaeufe/stand-pruefen) | nicht möglich | 1 Aufruf, meist ohne Nutzdaten | Schiefstand wird erkennbar, **bevor** Folgehandlungen ausgelöst werden |
+| [B — Änderung verteilen](/ablaeufe/aenderung-verteilen) | 6 Aufrufe, 3 Vollübermittlungen | 3 Ereignisse plus fakultative Abrufe | Abruf zeitlich entkoppelt; keine Replikation beim Berechtigten |
+| [C — Reklamation](/ablaeufe/clearing) | 5 bis 9 Aufrufe, kein Endzustand | 2 Aufrufe, Vorgang mit Zustand und Frist | Clearing wird nachvollziehbar und abschließbar |
+| [D — neuer Berechtigter](/ablaeufe/neuer-berechtigter) | nicht möglich | 2 Aufrufe | Selbstbedienung statt Wartezustand |
+
+<Warning>
+  Der Ablaufvergleich zeigt, dass die **Zahl der Aufrufe nicht das entscheidende Kriterium**
+  ist — in Vorfall B ist sie vergleichbar.
+
+  Entscheidend ist, dass zwei der vier alltäglichen Vorgänge in der konsultierten Fassung
+  architektonisch **gar nicht** durchführbar sind und in der Praxis auf manuelle Klärung
+  ausweichen müssen.
+</Warning>
+
+## Wo der Zugewinn jeweils liegt
+
+<Columns cols={2}>
+  <Card title="Was neu möglich wird" icon="unlock" horizontal>
+    Lesen vor dem Prozessschritt. Selbstbedienung des neuen Berechtigten. Inkrementeller
+    Abgleich nach einem Ausfall. Ablehnen mit Begründung. Abfragen des Umsetzungsstands.
+  </Card>
+  <Card title="Was billiger wird" icon="feather" horizontal>
+    Teiländerung statt Vollübermittlung. Ereignis statt Vollversand. `304` statt Nutzdaten.
+    Zeitscheibe zum Stichtag statt gesamtes Bündel.
+  </Card>
+  <Card title="Was sicherer wird" icon="shield-halved" horizontal>
+    `If-Match` gegen verlorene Änderungen. Tagged unions gegen fachlich unmögliche Payloads.
+    Explizites `validTo` gegen Lücken und Überlappungen.
+  </Card>
+  <Card title="Was nachvollziehbar wird" icon="clipboard-check" horizontal>
+    Clearing mit Zustand, Frist und Abschluss. `observedETag` als Beleg. `Deprecation` und
+    `Sunset` maschinenlesbar.
+  </Card>
+</Columns>
+
+## Weiter
+
+<CardGroup cols={2}>
+  <Card title="Befunde" icon="magnifying-glass" href="/gegenueberstellung/befunde">
+    Zwei Mängel der konsultierten Fassung, die unabhängig von der Architekturfrage zu
+    korrigieren sind.
+  </Card>
+  <Card title="Antizipierte Einwände" icon="comments" href="/gegenueberstellung/einwaende">
+    Fünf Einwände gegen diesen Vorschlag — benannt und beantwortet, statt abgewartet.
+  </Card>
+</CardGroup>

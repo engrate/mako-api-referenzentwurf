@@ -37,7 +37,8 @@ ausschließlich das Kommunikationsmuster.
 
 ```bash
 pip install -r requirements.txt
-python3 tools/validate.py
+python3 tools/validate.py        # Spezifikation und Beispiele
+python3 tools/validate_docs.py   # Dokumentationsseite
 ```
 
 Dieselbe Prüfung läuft bei jedem Push automatisch über GitHub Actions — das Ergebnis steht
@@ -58,8 +59,33 @@ nicht, was es leisten soll.
 | `examples/01–03` | Gültige Bündel: pauschale MaLo, Überschusseinspeisung, Speicher mit Ladepunkt und Kaskade |
 | `examples/04–05` | Negativbeispiele, die abgelehnt werden müssen |
 | `examples/06–07` | Clearing-Fall mit Zustand, leichtgewichtiges Änderungsereignis |
-| `tools/validate.py` | Prüfwerkzeug |
-| `.github/workflows/validate.yml` | CI-Workflow, führt die Prüfung bei jedem Push aus |
+| `tools/validate.py` | Prüfwerkzeug für Spezifikation und Beispiele |
+| `tools/validate_docs.py` | Prüfwerkzeug für die Dokumentationsseite |
+| `docs.json` | Mintlify-Konfiguration der Dokumentationsseite |
+| `einstieg/`, `architektur/`, `ablaeufe/`, `gegenueberstellung/`, `referenz/`, `api-referenz/` | Seiten der Dokumentation (MDX) |
+| `.github/workflows/validate.yml` | CI-Workflow, führt die Prüfungen bei jedem Push aus |
+
+## Dokumentation
+
+Der Entwurf ist zusätzlich als Dokumentationsseite aufbereitet — Architektur, die vier
+Geschäftsvorfälle im Ablaufvergleich, die antizipierten Einwände und eine aus
+`openapi/netzbetreiber-api.yaml` erzeugte API-Referenz aller 22 Operationen.
+
+Die Quelldateien liegen als MDX im Repository, die Konfiguration als `docs.json`
+([Mintlify](https://mintlify.com)). Lokale Vorschau:
+
+```bash
+npm i -g mint
+mint dev
+```
+
+Die API-Referenz wird dabei unmittelbar aus der OpenAPI-Datei erzeugt; es gibt keine zweite,
+abschreibbare Fassung der Spezifikation. `tools/validate_docs.py` prüft, dass jede
+Navigationsseite existiert, dass keine Seite verwaist ist und dass jede in der Navigation
+genannte Operation in der Spezifikation vorkommt.
+
+**Nicht Teil des eingereichten Stands.** Der Tag `konsultation-2026-08` enthält diese
+Dokumentation nicht — sie ist nach der Einreichung entstanden.
 
 ## Die wesentlichen Unterschiede
 

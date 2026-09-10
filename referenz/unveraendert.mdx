@@ -1,0 +1,108 @@
+---
+title: "Was unverändert bleibt"
+description: "Damit kein Missverständnis entsteht: Der Entwurf ändert keine Fachlichkeit."
+---
+
+Der Entwurf ändert **ausschließlich das Kommunikationsmuster**. Damit kein Missverständnis
+entsteht, hier die Liste dessen, was er nicht antastet.
+
+<AccordionGroup>
+  <Accordion title="Identifikatoren" icon="fingerprint" defaultOpen>
+    Lokationsbündel-ID, NeLo-ID, MaLo-ID, MeLo-ID, TR-ID, SR-ID und Marktpartner-ID sind
+    unverändert übernommen, **einschließlich der Prüfmuster**.
+
+    | Schema | Muster | Beispiel |
+    |---|---|---|
+    | `LocationBundleId` | `^F[A-Z\d]{9}\d$` | `F1234848431` |
+    | `NeloId` | `^E[A-Z\d]{9}\d$` | `E1234848431` |
+    | `MaloId` | `^\d{11}$` | `57685676748` |
+    | `MeloId` | `^DE\d{11}[A-Z\d]{20}$` | `DE00014545768S0000000000000003054` |
+    | `TrId` | `^D[A-Z\d]{9}\d$` | `D1234848431` |
+    | `SrId` | `^C[A-Z\d]{9}\d$` | `C1234848431` |
+    | `MarketPartnerId` | `^\d{13}$` | `9900987654321` |
+
+    Zur Lokationsbündel-ID: Wir teilen die Auffassung aus Beitrag #175, dass das Muster `G`
+    statt `F` lauten muss. Dieser Entwurf verwendet weiterhin `F`, um gegen den konsultierten
+    Stand vergleichbar zu bleiben; die Stelle ist im Schema entsprechend kommentiert.
+  </Accordion>
+
+  <Accordion title="Marktrollen und Zuständigkeiten" icon="users">
+    Der **Netzbetreiber bleibt der Verantwortliche** für das Lokationsbündel. Lieferant,
+    Messstellenbetreiber und Messwertverarbeiter sind Berechtigte.
+
+    Schreibend auf ein Bündel zugreifen darf ausschließlich der verantwortliche Netzbetreiber.
+    Der Entwurf verschiebt keine Hoheit — er gibt den Berechtigten lediglich einen Leseweg,
+    den sie heute nicht haben.
+
+    Zulässige Rollen in `MarketPartnerRef`: `NB`, `LF`, `MSB`, `MWV`, `UENB`.
+  </Accordion>
+
+  <Accordion title="Entscheidungsbaumdiagramme und Antwortcodes" icon="diagram-project">
+    Unverändert. Sie werden lediglich an einer Ressource mit Zustand geführt statt in einem
+    Aufruf ohne Rückbezug.
+
+    ```yaml
+    ClearingResolution:
+      required: [decisionTree, responseCode]
+      properties:
+        decisionTree:
+          pattern: '^E_\d{4}$'     # z. B. E_0594
+        responseCode:
+          pattern: '^A[A-Z\d]{2}$' # z. B. A10
+    ```
+
+    Siehe [Clearing](/ablaeufe/clearing).
+  </Accordion>
+
+  <Accordion title="Zeitpunkt-Semantik" icon="clock">
+    Der **Tagesbeginn 00:00 Uhr gesetzlicher deutscher Zeit** bleibt maßgeblich.
+
+    Der Entwurf überträgt ihn als Kalenderdatum (`2028-01-01`) statt als UTC-Zeitstempel
+    (`2027-12-31T23:00:00Z`), weil das weniger fehleranfällig ist — drückt aber **denselben
+    Sachverhalt** aus.
+
+    Zeitstempel von Vorgängen (`changedAt`, `openedAt`, `occurredAt`, `resolvedAt`) bleiben
+    vollständige `date-time`-Angaben in UTC. Siehe
+    [Zeitscheiben](/architektur/zeitscheiben#kalendertag-statt-utc-zeitstempel).
+  </Accordion>
+
+  <Accordion title="Sicherheitsniveau" icon="shield-halved">
+    Zertifikate der **Smart-Metering-PKI bleiben die Grundlage**. Die Authentisierung des
+    Clients am Authorization Server erfolgt in der Ausbaustufe 1 über das Signaturzertifikat.
+
+    OAuth 2.0 tritt hinzu, um Zugriffe abzubilden, die eine reine Marktpartner-Authentisierung
+    nicht abdecken kann: Letztverbraucher auf eigene Daten, übertragbare Berechtigungen an
+    Dritte, Anschlussfähigkeit an übergreifende Datenräume.
+
+    mTLS bleibt alternativ zulässig, in der Rolle „passiver EMT" gemäß den Regelungen zum
+    Übertragungsweg für API-Webdienste. Siehe [Sicherheit](/architektur/sicherheit).
+  </Accordion>
+
+  <Accordion title="Endpunktauflösung" icon="signs-post">
+    Über den **dezentralen Verzeichnisdienst** — identisch zur konsultierten Fassung. Der
+    `servers`-Block bildet dies als Variablenmuster ab, statt leer zu bleiben. Die API-Kennung
+    ist `nb`.
+  </Accordion>
+
+  <Accordion title="Fachlicher Inhalt des Lokationsbündels" icon="layer-group">
+    Dieselben Objekte, dieselben Zuordnungen, dieselben Zeitscheiben.
+
+    Sechs Knotentypen: Netzlokation, Messlokation, Marktlokation, Tranche, technische Ressource,
+    steuerbare Ressource. Sechs Kantentypen, die den Zuordnungen der konsultierten Fassung
+    entsprechen: NeLo→MeLo, MeLo→MeLo, MeLo→MaLo, MeLo→TR, MaLo→TR, MaLo→Tranche.
+
+    Siehe [Datenmodell](/architektur/datenmodell).
+  </Accordion>
+</AccordionGroup>
+
+## Was sich ändert
+
+Zur Abgrenzung, in einem Satz: Der Verantwortliche **hält** die Daten und stellt sie bereit;
+Berechtigte **rufen sie ab**, statt sie zugesandt und lokal repliziert zu bekommen.
+
+Alles Weitere — Leseoperationen, `ETag`, Teiländerung, Clearing mit Zustand, Ereignis statt
+Vollversand — folgt daraus.
+
+<Card title="Spezifikationsvergleich" icon="scale-balanced" href="/gegenueberstellung/spezifikationsvergleich">
+  Die vollständige Aufstellung der Unterschiede, ausgezählt aus beiden Spezifikationsdateien.
+</Card>

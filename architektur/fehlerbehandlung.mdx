@@ -1,0 +1,153 @@
+---
+title: "Fehlerbehandlung"
+description: "RFC 9457 Problem Details mit JSON-Pointer auf die Fundstelle — für jede Operation, auch für 400 und 422."
+---
+
+Die konsultierte Fassung definiert für **keine** Operation einen Response-Body — auch nicht
+für `400` und `422`. Ein Empfänger kann einen Validierungsfehler dort nicht maschinenlesbar
+zurückmelden; inhaltliche Fehler müssen den Umweg über einen neuen Aufruf in Gegenrichtung
+nehmen.
+
+Hier trägt jede Fehlerantwort einen Körper nach RFC 9457, ausgeliefert als
+`application/problem+json`.
+
+## Aufbau
+
+<ResponseField name="type" type="string (uri)" required>
+  Bezeichner der Fehlerart, etwa `tag:edi-energy.de:api:error:validation`. Stabil und
+  maschinenlesbar — der Client verzweigt darauf, nicht auf `title`.
+</ResponseField>
+
+<ResponseField name="title" type="string" required>
+  Kurze, für Menschen lesbare Bezeichnung.
+</ResponseField>
+
+<ResponseField name="status" type="integer" required>
+  Der HTTP-Statuscode, wiederholt im Körper.
+</ResponseField>
+
+<ResponseField name="detail" type="string">
+  Erläuterung zu diesem konkreten Vorkommnis.
+</ResponseField>
+
+<ResponseField name="instance" type="string (uri-reference)">
+  URL des betroffenen Vorgangs. Bei `409` auf einen bereits offenen Clearing-Fall zeigt
+  dieses Feld auf den bestehenden Fall.
+</ResponseField>
+
+<ResponseField name="errors" type="array">
+  Einzelne Verstöße mit Fundstelle.
+
+  <Expandable title="Felder je Verstoß">
+    <ResponseField name="pointer" type="string" required>
+      JSON-Pointer nach RFC 6901 auf die betroffene Stelle im Anfragekörper, etwa
+      `/timeSlices/0/members/2/metering/configurationId`.
+    </ResponseField>
+    <ResponseField name="message" type="string" required>
+      Beschreibung des Verstoßes.
+    </ResponseField>
+    <ResponseField name="code" type="string">
+      Stabiler Fehlercode, auf den ein Client verzweigen kann.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Beispiele
+
+<CodeGroup>
+```json 422 Fachlich nicht verarbeitbar
+{
+  "type": "tag:edi-energy.de:api:error:validation",
+  "title": "Lokationsbündel fachlich nicht verarbeitbar",
+  "status": 422,
+  "detail": "Eine pauschale Messlokation kann keine Messeinrichtung tragen.",
+  "instance": "/nb/2026-2/location-bundles/F1234848431",
+  "errors": [
+    {
+      "pointer": "/timeSlices/0/members/1/metering/configurationId",
+      "message": "Bei metering.type=pauschal nicht zulässig.",
+      "code": "pauschal.keineMesseinrichtung"
+    },
+    {
+      "pointer": "/timeSlices/0/members/1/metering/obisCodes",
+      "message": "Bei metering.type=pauschal nicht zulässig.",
+      "code": "pauschal.keineMesseinrichtung"
+    }
+  ]
+}
+```
+
+```json 412 Stand überholt
+{
+  "type": "tag:edi-energy.de:api:error:precondition-failed",
+  "title": "Der angegebene ETag entspricht nicht dem aktuellen Stand",
+  "status": 412,
+  "detail": "Aktueller ETag: \"b7e4d1a9\". Bitte neu lesen und zusammenführen.",
+  "instance": "/nb/2026-2/location-bundles/F1234848431"
+}
+```
+
+```json 409 Fall besteht bereits
+{
+  "type": "tag:edi-energy.de:api:error:clearing-case-exists",
+  "title": "Zu diesem Sachverhalt besteht bereits ein offener Clearing-Fall",
+  "status": 409,
+  "instance": "/nb/2026-2/clearing-cases/c4a1b2d3-0e5f-4a6b-8c7d-9e0f1a2b3c4d"
+}
+```
+
+```json 422 Unzulässiger Zustandsübergang
+{
+  "type": "tag:edi-energy.de:api:error:invalid-state-transition",
+  "title": "Unzulässiger Zustandsübergang",
+  "status": 422,
+  "detail": "Aktueller Zustand: beigelegt. Zulässige Folgezustände: keine.",
+  "instance": "/nb/2026-2/clearing-cases/c4a1b2d3-0e5f-4a6b-8c7d-9e0f1a2b3c4d"
+}
+```
+</CodeGroup>
+
+<Note>
+  `type`, `title`, `detail` und `code` sind in diesen Beispielen illustrativ. Der Entwurf
+  legt die **Struktur** fest, nicht den Katalog der Fehlerarten — dieser gehört in die
+  Festlegung und ist hier bewusst offen gelassen.
+</Note>
+
+## Wo welcher Code greift
+
+| Code | Anlass | `Retry-After` |
+|---|---|---|
+| `400` | Fehlerhafte Anfrage — Syntax, unbekannter Parameter | — |
+| `401` | Nicht authentisiert | — |
+| `403` | Authentisiert, aber für Objekt und Zeitraum nicht berechtigt | — |
+| `404` | Ressource nicht vorhanden | — |
+| `409` | Fachlicher Konflikt mit dem aktuellen Zustand | — |
+| `412` | `If-Match` überholt | — |
+| `422` | Syntaktisch gültig, fachlich nicht verarbeitbar | — |
+| `428` | Schreibender Zugriff ohne `If-Match` | — |
+| `429` | Ratenbegrenzung erreicht | gesetzt |
+| `503` | Vorübergehend nicht verfügbar | gesetzt |
+
+## Ablehnen können ist selbst ein Gewinn
+
+In der konsultierten Fassung beschreibt das Schema `resultLocationBundle` ausdrücklich, die
+Antwort sei „immer, dass der Empfänger des Lokationsbündels die Daten übernommen hat". Es
+gibt keine Ablehnung.
+
+<Warning>
+  Das hat eine Konsequenz, die über die Technik hinausgeht: Ein Lieferant, der einer
+  Übermittlung inhaltlich widerspricht, muss den Empfang dennoch mit einem Code bestätigen,
+  der ausdrücklich **Übernahme** bedeutet. Er muss eine unzutreffende Aussage abgeben, um
+  protokollkonform zu bleiben — und kann seinen Widerspruch erst in einem separaten
+  Clearing-Aufruf vorbringen, der keine Vorgangsreferenz trägt.
+</Warning>
+
+Hier ist die Ablehnung Teil der Antwort: `422` mit JSON-Pointern auf die beanstandeten
+Stellen, im selben Austausch. Die Antwort trägt damit Entscheidungsinformation, statt eine
+Empfangsbestätigung zu sein, für die HTTP bereits einen Statuscode vorsieht.
+
+## Das Ratenlimit
+
+`429` und `503` tragen `Retry-After` in Sekunden. Die Stellungnahme beantragt ohnehin
+Mindestanforderungen an Verfügbarkeit und Kapazität sowie eine normierte Retry-Strategie; der
+Entwurf stellt dafür die Header bereit, auf die eine solche Strategie aufsetzen kann.

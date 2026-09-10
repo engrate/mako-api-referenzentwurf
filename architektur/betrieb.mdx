@@ -1,0 +1,115 @@
+---
+title: "Betrieb und Versionierung"
+sidebarTitle: "Betrieb"
+description: "Semester-Releases, abfragbarer Umsetzungsstand, maschinenlesbare Abkündigung."
+---
+
+Drei Fragen, die heute nach jedem Format-Update durch Ausprobieren geklärt werden müssen,
+haben hier eine Antwort im Protokoll.
+
+## Semester-Release im Basispfad
+
+```yaml
+servers:
+  - url: https://{host}/nb/{basePath}
+    variables:
+      host:
+        default: api.example-netzbetreiber.de
+      basePath:
+        default: "2026-2"
+```
+
+| Basispfad | Bedeutung |
+|---|---|
+| `2026-2` | Ein bestimmtes Semester-Release, festgenagelt |
+| *(ohne Versionsangabe)* | Zeigt stets auf das aktuell **verpflichtende** Semester-Release |
+| `v` | Vorweg-Version |
+
+Die Version steht im Pfad, nicht in einem Header — ein Client, der gegen ein bestimmtes
+Semester-Release entwickelt wurde, spricht dieses an und wird von einem Release-Wechsel nicht
+überrascht. Host und Basispfad werden über den dezentralen Verzeichnisdienst aufgelöst,
+identisch zur konsultierten Fassung.
+
+## Umsetzungsstand abfragen
+
+`GET /versions` gibt maschinenlesbar zurück, welche Endpunkte dieser Marktpartner
+vollständig, teilweise oder nicht implementiert hat.
+
+<CodeGroup>
+```http Anfrage
+GET /nb/2026-2/versions
+```
+
+```json Antwort
+{
+  "semesterRelease": "2026-2",
+  "preReleaseVersion": "2026-2.5",
+  "endpoints": [
+    { "operationId": "getLocationBundle",   "state": "vollstaendig" },
+    { "operationId": "listLocationBundles", "state": "vollstaendig" },
+    {
+      "operationId": "patchLocationBundle",
+      "state": "teilweise",
+      "note": "merge-patch nur auf Zeitscheibenebene, nicht auf Knotenebene"
+    },
+    { "operationId": "createNetworkOperatorChangePackage", "state": "nichtImplementiert" }
+  ]
+}
+```
+</CodeGroup>
+
+Zustände: `vollstaendig`, `teilweise`, `nichtImplementiert`. Das Feld `note` nimmt eine
+Einschränkung in Prosa auf, wo `teilweise` allein nicht genügt.
+
+<Tip>
+  Diese Ressource beantwortet eine Frage, die heute nach jedem Format-Update erneut durch
+  Ausprobieren geklärt werden muss — und sie ist ohne Authentisierung abrufbar, weil der
+  Umsetzungsstand keine Geschäftsdaten enthält.
+</Tip>
+
+## Abkündigung nach RFC 8594
+
+Statt eines Freitexthinweises im Anwendungshandbuch zwei maschinenlesbare Header:
+
+```http
+HTTP/1.1 200 OK
+Deprecation: Tue, 01 Jun 2027 00:00:00 GMT
+Sunset: Fri, 01 Oct 2027 00:00:00 GMT
+Link: </nb/2026-2/location-bundles>; rel="successor-version"
+```
+
+| Header | Bedeutung |
+|---|---|
+| `Deprecation` | Die Ressource ist abgekündigt — sie funktioniert noch, soll aber nicht mehr neu verwendet werden |
+| `Sunset` | Ab diesem Zeitpunkt wird die Ressource nicht mehr bereitgestellt |
+
+Ein Client kann das protokollieren und seinen Betreiber warnen, bevor die Ressource wegfällt.
+Ein Freitexthinweis in einem PDF kann das nicht.
+
+## Verfügbarkeit und Ratenbegrenzung
+
+Die Stellungnahme beantragt Mindestanforderungen an Verfügbarkeit und Kapazität sowie eine
+normierte Retry-Strategie. Der Entwurf legt diese Werte nicht fest — das gehört in die
+Festlegung — stellt aber die Header bereit, auf die eine solche Strategie aufsetzt:
+
+| Statuscode | Header | Bedeutung für den Client |
+|---|---|---|
+| `429 Too Many Requests` | `Retry-After` | Ratenbegrenzung erreicht, frühester nächster Versuch |
+| `503 Service Unavailable` | `Retry-After` | Vorübergehend nicht verfügbar |
+| `202 Accepted` | `Retry-After` | Ergebnis noch nicht fertig, frühester sinnvoller Abruf |
+
+<Note>
+  Diese Anforderungen sind im Pull-Modell nicht höher als im Push-Modell — sie werden dort nur
+  sichtbar, weil das Verhalten des Gegenübers unmittelbar spürbar ist. Siehe
+  [Antizipierte Einwände](/gegenueberstellung/einwaende).
+</Note>
+
+## Verzögerte Antworten
+
+Das Übergabepaket beim Netzbetreiberwechsel zeigt, wie der Entwurf mit Operationen umgeht, die
+innerhalb eines technischen Timeouts nicht abschließbar sind: `202 Accepted`, `Location` auf
+die künftige Ergebnisressource, `Retry-After`. Keine Rückrufkonstruktion, kein selbst
+geführter Vorgangszustand — die URL **ist** der Zustand.
+
+Der Ablauf im Einzelnen steht unter
+[Netzbetreiberwechsel](/ablaeufe/netzbetreiberwechsel).

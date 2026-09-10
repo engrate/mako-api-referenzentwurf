@@ -1,0 +1,151 @@
+---
+title: "Prüfwerkzeug"
+description: "Zwei Python-Skripte und ein CI-Workflow — der Nachweis, dass fachliche Bedingungen im Schema automatisiert prüfbar sind."
+---
+
+Der Konsultationsbeitrag trägt vor, fachliche Bedingungen gehörten in das Schema und seien
+dort automatisiert prüfbar. Die Werkzeuge dieses Repositorys sind der **Beleg** dafür — nicht
+eine Zutat, sondern Teil des Arguments.
+
+## Spezifikation und Beispiele
+
+```bash
+pip install -r requirements.txt
+python3 tools/validate.py
+```
+
+<Steps>
+  <Step title="Spezifikation gegen OpenAPI 3.1">
+    `openapi-spec-validator` prüft `openapi/netzbetreiber-api.yaml` gegen die
+    OpenAPI-3.1-Spezifikation. Anschließend zählt das Werkzeug Pfade, Operationen, Schemas und
+    die Verbverteilung aus — die Kennzahlen dieser Dokumentation sind nicht eingetragen, sondern
+    gemessen.
+  </Step>
+  <Step title="Jedes Beispiel gegen sein Schema">
+    Das Feld `_schema` in der Beispieldatei nennt das zu verwendende Schema; ohne Angabe gilt
+    `LocationBundleDocument`. Geprüft wird mit `jsonschema` gegen Draft 2020-12 — dem Draft, von
+    dem OpenAPI 3.1 ein Superset ist. Es gibt keine eigene Interpretationsschicht.
+  </Step>
+  <Step title="Negativbeispiele mit umgekehrter Erwartung">
+    Beispiele mit `"_erwartet": "ungueltig"` **müssen** abgelehnt werden. Wird eines von ihnen
+    akzeptiert, schlägt die Prüfung fehl — denn dann leistet das Schema nicht, was es leisten
+    soll. Das Werkzeug gibt die Fundstelle als JSON-Pointer aus.
+  </Step>
+</Steps>
+
+### Zwei Details, die das Argument tragen
+
+<AccordionGroup>
+  <Accordion title="strip_meta — erklärende Felder sind keine Nutzdaten" icon="eraser">
+    Die Beispieldateien tragen `_beschreibung`, `_schema` und `_erwartet`. Vor der Prüfung
+    entfernt `strip_meta` rekursiv alle Felder mit führendem Unterstrich. Geprüft wird also der
+    Payload, den ein echter Aufruf übertragen würde — nicht eine kommentierte Variante davon.
+  </Accordion>
+  <Accordion title="resolve_local_refs — Geschwisterfelder nach 3.1-Regel" icon="code-branch">
+    `$ref`-Verweise auf `#/components/schemas/...` werden aufgelöst, damit der Validator ohne
+    Registry arbeiten kann. Dabei werden **Geschwisterfelder neben `$ref` über das aufgelöste
+    Ziel gelegt** — genau wie OpenAPI 3.1 es vorschreibt und 3.0 es nicht erlaubte.
+
+    Das ist derselbe Punkt, der in der konsultierten Fassung dazu führt, dass praktisch die
+    gesamte fachliche Felddokumentation von konformen Werkzeugen verworfen wird. Siehe
+    [Befunde](/gegenueberstellung/befunde#ref-mit-geschwisterfeldern).
+  </Accordion>
+  <Accordion title="clean — OpenAPI-eigene Schlüsselwörter entfernen" icon="broom">
+    `discriminator`, `xml` und `externalDocs` sind OpenAPI-Erweiterungen, die JSON Schema nicht
+    kennt. Sie werden vor der Validierung entfernt. Die Wirkung der tagged unions bleibt
+    erhalten, weil sie über `oneOf` und `const` ausgedrückt ist — der `discriminator` ist nur
+    die Abkürzung für Codegeneratoren.
+  </Accordion>
+</AccordionGroup>
+
+### Ausgabe
+
+```text
+1. OpenAPI-Spezifikation
+   OK  netzbetreiber-api.yaml ist gültiges OpenAPI 3.1.0
+       14 Pfade, 22 Operationen, 61 Schemas
+       Verbverteilung: GET=13, PUT=2, POST=3, PATCH=2, DELETE=2
+
+2. Beispiele gegen die Schemas
+   OK  01-pauschale-marktlokation.json
+   OK  02-ueberschusseinspeisung.json
+   OK  03-speicher-ladepunkt.json
+   OK  04-UNGUELTIG-pauschal-mit-obis.json
+       erwartungsgemäß abgelehnt bei /data/timeSlices/0/members/1
+   OK  05-UNGUELTIG-unzulaessige-kante.json
+       erwartungsgemäß abgelehnt bei /data/timeSlices/0/relations/0
+   OK  06-clearing-fall.json
+   OK  07-aenderungsereignis.json
+
+Alle Prüfungen bestanden.
+```
+
+Rückgabewert 1 bei jedem Fehlschlag — auch dann, wenn ein Negativbeispiel durchgelassen wird.
+
+## Diese Dokumentation
+
+```bash
+python3 tools/validate_docs.py
+```
+
+Prüft die Mintlify-Konfiguration, ohne Netzzugriff und ohne Node.js:
+
+| Prüfung | Fehlschlag bedeutet |
+|---|---|
+| `docs.json` ist gültiges JSON | Die Seite baut nicht |
+| Pflichtfelder `name`, `theme`, `colors.primary`, `navigation` vorhanden | Die Seite baut nicht |
+| Jede in der Navigation genannte Seite existiert als `.mdx` | Toter Navigationseintrag |
+| Jede `.mdx`-Datei ist in der Navigation erreichbar | Verwaiste Seite, nicht auffindbar |
+| Jede `openapi`-Angabe verweist auf eine vorhandene Datei | API-Referenz bleibt leer |
+| Jede `METHOD /pfad`-Angabe existiert in der OpenAPI-Datei | Toter Operationseintrag |
+| Logo- und Favicon-Dateien vorhanden | Fehlende Bilder |
+
+<Tip>
+  Die Prüfung auf `METHOD /pfad` ist der Grund, warum die API-Referenz in dieser Dokumentation
+  explizit nach den sechs Tags der Spezifikation gruppiert ist, statt flach automatisch erzeugt
+  zu werden: Weicht ein Pfad in der Spezifikation von der Navigation ab, fällt das in der CI
+  auf und nicht erst im gebauten Ergebnis.
+</Tip>
+
+## CI
+
+Beide Werkzeuge laufen bei jedem Push und jedem Pull Request über
+[`.github/workflows/validate.yml`](https://github.com/engrate/mako-api-referenzentwurf/blob/main/.github/workflows/validate.yml).
+Das Ergebnis steht im Badge des README.
+
+```yaml
+- name: Spezifikation und Beispiele validieren
+  run: python tools/validate.py
+
+- name: Dokumentation validieren
+  run: python tools/validate_docs.py
+```
+
+<Note>
+  Schlägt eine der Prüfungen fehl, wird der Lauf rot. Erst wenn er grün ist, sollten Links in
+  eine Einreichung gehen.
+</Note>
+
+## Diese Dokumentation lokal bauen
+
+```bash
+npm i -g mint
+mint dev
+```
+
+Die API-Referenz wird dabei direkt aus `openapi/netzbetreiber-api.yaml` erzeugt. Es gibt keine
+zweite, abschreibbare Fassung der Spezifikation — was in der Referenz steht, steht in der
+Datei, die das Prüfwerkzeug validiert.
+
+## Abhängigkeiten
+
+```text requirements.txt
+openapi-spec-validator>=0.7
+jsonschema>=4.20
+PyYAML>=6.0
+```
+
+Drei Pakete, alle quelloffen und verbreitet. Python 3.12 in der CI. Keine eigene
+Validierungslogik, die selbst fehlerhaft sein könnte — das ist Absicht: Der Nachweis soll mit
+Standardwerkzeugen gelingen, weil die Behauptung lautet, dass er mit Standardwerkzeugen
+gelingt.
