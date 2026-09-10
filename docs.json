@@ -4,9 +4,25 @@
   "name": "MaKo-API Referenzentwurf",
   "description": "Ressourcenorientierter Referenzentwurf für den MaKo-Webdienst Lokationsbündel. Konsultationsbeitrag zu Mitteilung Nr. 57 der Bundesnetzagentur.",
   "colors": {
-    "primary": "#0F766E",
-    "light": "#2DD4BF",
-    "dark": "#115E59"
+    "primary": "#FFBE26",
+    "light": "#FFBE26",
+    "dark": "#FFBE26"
+  },
+  "fonts": {
+    "family": "Work Sans",
+    "weight": 400,
+    "heading": {
+      "family": "Work Sans",
+      "weight": 400
+    },
+    "body": {
+      "family": "Work Sans",
+      "weight": 400
+    }
+  },
+  "appearance": {
+    "default": "light",
+    "strict": true
   },
   "favicon": "/images/favicon.svg",
   "logo": {
@@ -89,64 +105,6 @@
             "pages": [
               "api-referenz/einfuehrung",
               "api-referenz/konventionen"
-            ]
-          },
-          {
-            "group": "Lokationsbündel",
-            "icon": "layer-group",
-            "pages": [
-              "GET /location-bundles",
-              "GET /location-bundles/{locationBundleId}",
-              "PUT /location-bundles/{locationBundleId}",
-              "PATCH /location-bundles/{locationBundleId}",
-              "GET /location-bundles/{locationBundleId}/time-slices",
-              "GET /location-bundles/{locationBundleId}/time-slices/{validFrom}",
-              "PUT /location-bundles/{locationBundleId}/time-slices/{validFrom}",
-              "DELETE /location-bundles/{locationBundleId}/time-slices/{validFrom}"
-            ]
-          },
-          {
-            "group": "Lokationen",
-            "icon": "location-dot",
-            "pages": [
-              "GET /network-locations/{neloId}",
-              "GET /market-locations/{maloId}",
-              "GET /metering-locations/{meloId}"
-            ]
-          },
-          {
-            "group": "Clearing",
-            "icon": "gavel",
-            "pages": [
-              "GET /location-bundles/{locationBundleId}/clearing-cases",
-              "POST /location-bundles/{locationBundleId}/clearing-cases",
-              "GET /clearing-cases/{clearingCaseId}",
-              "PATCH /clearing-cases/{clearingCaseId}"
-            ]
-          },
-          {
-            "group": "Netzbetreiberwechsel",
-            "icon": "arrow-right-arrow-left",
-            "pages": [
-              "POST /network-operator-change-packages",
-              "GET /network-operator-change-packages/{packageId}"
-            ]
-          },
-          {
-            "group": "Benachrichtigung",
-            "icon": "bell",
-            "pages": [
-              "GET /subscriptions",
-              "POST /subscriptions",
-              "GET /subscriptions/{subscriptionId}",
-              "DELETE /subscriptions/{subscriptionId}"
-            ]
-          },
-          {
-            "group": "Betrieb",
-            "icon": "gear",
-            "pages": [
-              "GET /versions"
             ]
           }
         ]

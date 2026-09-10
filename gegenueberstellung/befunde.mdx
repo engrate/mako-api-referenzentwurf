@@ -49,8 +49,8 @@ flowchart LR
     P["Pfadbeschreibung<br/><i>„unter locationBundleId …"</i>"] -.->|widerspricht| S["Schema resultLocationBundle<br/><i>Feld existiert nicht</i>"]
     S --> R["Bezug läuft ausschließlich<br/>über den referenceId-Header"]
 
-    classDef warn fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D
-    class P,S warn
+    classDef widerspruch fill:#EFEFEF,stroke:#E5AB22,color:#1A1A1A
+    class P,S widerspruch
 ```
 
 Der Bezug zwischen Antwort und Übermittlung läuft damit ausschließlich über den

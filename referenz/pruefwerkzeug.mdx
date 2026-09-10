@@ -96,16 +96,22 @@ Prüft die Mintlify-Konfiguration, ohne Netzzugriff und ohne Node.js:
 | Pflichtfelder `name`, `theme`, `colors.primary`, `navigation` vorhanden | Die Seite baut nicht |
 | Jede in der Navigation genannte Seite existiert als `.mdx` | Toter Navigationseintrag |
 | Jede `.mdx`-Datei ist in der Navigation erreichbar | Verwaiste Seite, nicht auffindbar |
-| Jede `openapi`-Angabe verweist auf eine vorhandene Datei | API-Referenz bleibt leer |
-| Jede `METHOD /pfad`-Angabe existiert in der OpenAPI-Datei | Toter Operationseintrag |
+| Jede `openapi`-Angabe verweist auf eine vorhandene Datei mit Operationen | API-Referenz bleibt leer |
+| Kein Navigationseintrag der Form `METHOD /pfad` | API-Referenz bleibt leer (siehe unten) |
 | Logo- und Favicon-Dateien vorhanden | Fehlende Bilder |
 
-<Tip>
-  Die Prüfung auf `METHOD /pfad` ist der Grund, warum die API-Referenz in dieser Dokumentation
-  explizit nach den sechs Tags der Spezifikation gruppiert ist, statt flach automatisch erzeugt
-  zu werden: Weicht ein Pfad in der Spezifikation von der Navigation ab, fällt das in der CI
-  auf und nicht erst im gebauten Ergebnis.
-</Tip>
+<Warning>
+  **Warum `METHOD /pfad` hier nicht verwendet wird.** Die Mintlify-Dokumentation beschreibt,
+  dass Operationen einzeln als `GET /location-bundles` in der Navigation aufgeführt werden
+  können. Im Build dieses Projekts werden solche Einträge stillschweigend verworfen — und mit
+  ihnen die automatische Erzeugung: Der Bereich enthielt dann **keine einzige** der 22
+  Operationsseiten, ohne Fehlermeldung.
+
+  Der Bereich führt deshalb nur `openapi` und eine Überblicksgruppe. Die 22 Operationsseiten
+  entstehen automatisch und werden dabei nach den sechs Tags der Spezifikation gruppiert — das
+  Ergebnis, das mit den Einzeleinträgen beabsichtigt war. `tools/validate_docs.py` lehnt
+  Einzeleinträge ab, damit dieser Weg nicht versehentlich wieder eingeschlagen wird.
+</Warning>
 
 ## CI
 
@@ -136,6 +142,10 @@ mint dev
 Die API-Referenz wird dabei direkt aus `openapi/netzbetreiber-api.yaml` erzeugt. Es gibt keine
 zweite, abschreibbare Fassung der Spezifikation — was in der Referenz steht, steht in der
 Datei, die das Prüfwerkzeug validiert.
+
+Das Erscheinungsbild steckt in zwei Dateien: `docs.json` (Farben, Schriften, Hell-Modus) und
+`style.css` (Grauskala, Flächen, Kapselform der Schaltflächen, Hero-Zeile in Libre
+Baskerville).
 
 ## Abhängigkeiten
 

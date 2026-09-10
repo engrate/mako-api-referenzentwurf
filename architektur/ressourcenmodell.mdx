@@ -63,9 +63,11 @@ flowchart TD
     PKG -->|links.locationBundle| LB
     SUB -.->|Ereignis nennt resource.href| LB
 
-    classDef haupt fill:#0F766E,stroke:#115E59,color:#F0FDFA
-    classDef liste fill:#CCFBF1,stroke:#14B8A6,color:#134E4A
-    class LB,TS,CC,PKG,SUB haupt
+    classDef kern fill:#FFBE26,stroke:#E5AB22,color:#1A1A1A
+    classDef einzel fill:#FFFCD0,stroke:#E5AB22,color:#1A1A1A
+    classDef liste fill:#F5F5F5,stroke:#E5E5E5,color:#1A1A1A
+    class LB kern
+    class TS,CC,PKG,SUB einzel
     class LBL,TSL,CCL,VER liste
 ```
 

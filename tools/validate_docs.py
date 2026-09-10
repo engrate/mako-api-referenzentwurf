@@ -5,8 +5,12 @@ Validiert die Mintlify-Dokumentation:
 1. docs.json ist gültiges JSON und traegt die Pflichtfelder.
 2. Jede in der Navigation genannte Seite existiert als .mdx-Datei.
 3. Jede .mdx-Datei ist ueber die Navigation erreichbar.
-4. Jede referenzierte OpenAPI-Datei liegt am angegebenen Ort, und jede
-   'METHOD /pfad'-Angabe kommt darin tatsaechlich vor.
+4. Jede referenzierte OpenAPI-Datei liegt am angegebenen Ort und enthaelt
+   Operationen.
+   Ausserdem: KEIN Navigationseintrag der Form 'METHOD /pfad'. Solche
+   Eintraege werden vom Build stillschweigend verworfen und unterdruecken
+   dabei die automatische Erzeugung der Operationsseiten - der Bereich
+   bleibt dann ohne Fehlermeldung vollstaendig leer.
 5. Logo und Favicon liegen am angegebenen Ort.
 
 Die Pruefung kommt ohne Netzzugriff und ohne Node.js aus. Sie ersetzt nicht
@@ -148,24 +152,25 @@ for ref in sorted(spec_refs):
         continue
     try:
         loaded[ref] = yaml.safe_load(path.read_text(encoding="utf-8"))
-        n_ops = sum(1 for p in loaded[ref].get("paths", {}).values()
-                    for k in p if k in VERBS)
-        ok(f"{ref} — {len(loaded[ref].get('paths', {}))} Pfade, {n_ops} Operationen")
+        routes = loaded[ref].get("paths", {})
+        n_ops = sum(1 for p in routes.values() for k in p if k in VERBS)
+        if not n_ops:
+            fail(f"OpenAPI-Datei '{ref}' enthaelt keine Operationen")
+        else:
+            ok(f"{ref} — {len(routes)} Pfade, {n_ops} Operationen, "
+               f"werden automatisch erzeugt")
     except Exception as exc:                                # noqa: BLE001
         fail(f"OpenAPI-Datei '{ref}' ist nicht lesbar", exc)
 
-for ref, specs in op_refs:
-    verb, _, route = ref.partition(" ")
-    if not specs:
-        fail(f"Operationseintrag '{ref}' ohne zugeordnete OpenAPI-Datei")
-        continue
-    if not any(route in loaded.get(s, {}).get("paths", {})
-               and verb.lower() in loaded[s]["paths"][route]
-               for s in specs if s in loaded):
-        fail(f"Operation '{ref}' kommt in {', '.join(specs)} nicht vor")
-
-if op_refs and not any(f.startswith("Operation") for f in failures):
-    ok(f"{len(op_refs)} Operationseintraege stimmen mit der Spezifikation ueberein")
+# Einzeln aufgefuehrte Operationen sind hier unzulaessig: der Build verwirft
+# sie stillschweigend UND erzeugt dann auch keine Operationsseiten mehr.
+for ref, _ in op_refs:
+    fail(f"Navigationseintrag '{ref}' ist ein Operationseintrag",
+         "Solche Eintraege werden vom Build verworfen und unterdruecken die "
+         "automatische Erzeugung: der Bereich bleibt dann leer. Stattdessen nur "
+         "'openapi' setzen und die Operationsseiten automatisch erzeugen lassen.")
+if not op_refs:
+    ok("Keine Operationseintraege in der Navigation (korrekt)")
 
 
 # -------------------------------------------------------------- 5. Bilder
@@ -192,5 +197,7 @@ if failures:
     sys.exit(1)
 
 print(f"{GREEN}Alle Pruefungen bestanden.{RESET}")
-print(f"{len(referenced)} Seiten, {len(op_refs)} Operationseintraege, "
-      f"{len(spec_refs)} OpenAPI-Datei(en).")
+n_ops = sum(1 for s in loaded.values()
+            for p in s.get("paths", {}).values() for k in p if k in VERBS)
+print(f"{len(referenced)} Seiten, {len(spec_refs)} OpenAPI-Datei(en) mit "
+      f"{n_ops} automatisch erzeugten Operationsseiten.")
