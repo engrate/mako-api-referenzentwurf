@@ -1,0 +1,125 @@
+---
+title: "Vorfall D — Neuer Berechtigter"
+sidebarTitle: "Neuer Berechtigter"
+description: "Ein neuer Lieferant übernimmt eine Marktlokation. Selbstbedienung statt Wartezustand."
+---
+
+## Konsultierte Fassung
+
+**Der Lieferant kann nichts tun.** Er ist darauf angewiesen, dass der Netzbetreiber ihm das
+Bündel aktiv zusendet.
+
+Bleibt die Zusendung aus, gibt es keinen Weg, sie anzufordern:
+
+<Columns cols={3}>
+  <Card title="Übersehen" icon="eye-slash">
+    Der Versand wurde im Prozess des Netzbetreibers nicht ausgelöst.
+  </Card>
+  <Card title="Berechtigung nicht gepflegt" icon="user-slash">
+    Die Zuordnung des neuen Lieferanten war im System des Netzbetreibers noch nicht
+    eingetragen.
+  </Card>
+  <Card title="Zustellung fehlgeschlagen" icon="plug-circle-xmark">
+    Der Endpunkt des Lieferanten war nicht erreichbar, und es gibt keinen Abrufweg als
+    Rückfallebene.
+  </Card>
+</Columns>
+
+Der Lieferant beginnt die Belieferung ohne Kenntnis der Bündelstruktur — oder klärt
+telefonisch.
+
+## Referenzentwurf
+
+| Schritt | Aufruf | Antwort |
+|:---|:---|:---|
+| 1 | `GET /location-bundles?market-location=57685676748` | Liste der Bündel, die diese Marktlokation enthalten |
+| 2 | `GET /location-bundles/{id}?valid-at=2027-11-01` | Die zum Lieferbeginn gültige Zeitscheibe |
+
+<Steps>
+  <Step title="Das zuständige Bündel finden">
+    Der Lieferant kennt die Marktlokation, nicht die Lokationsbündel-ID. Er sucht über den
+    Filter:
+
+    ```http
+    GET /nb/2026-2/location-bundles?market-location=57685676748
+    ```
+
+    ```json
+    {
+      "data": [
+        {
+          "type": "Lokationsbuendel",
+          "locationBundleId": "F1234848431",
+          "href": "/nb/2026-2/location-bundles/F1234848431",
+          "changedAt": "2027-09-14T08:12:03Z",
+          "validFrom": "2027-10-01",
+          "validTo": null
+        }
+      ],
+      "links": { "self": { "href": "/nb/2026-2/location-bundles?market-location=57685676748" } }
+    }
+    ```
+
+    Die Liste enthält **nur** Bündel, für die der aufrufende Marktpartner berechtigt ist. Die
+    Filterung durch den Server ist die Berechtigungsprüfung.
+  </Step>
+  <Step title="Die Zeitscheibe zum Lieferbeginn abrufen">
+    ```http
+    GET /nb/2026-2/location-bundles/F1234848431?valid-at=2027-11-01
+    ```
+
+    Genau die Zusammensetzung, die am Tag des Lieferbeginns gilt — nicht die Historie der
+    Vorgängerbelieferung, auf die der neue Lieferant ohnehin keinen Anspruch hat.
+  </Step>
+</Steps>
+
+```mermaid
+flowchart LR
+    A["Neuer Lieferant<br/>kennt die MaLo-ID"] --> B["GET /location-bundles<br/>?market-location=57685676748"]
+    B --> C["Liste der berechtigten Bündel<br/>mit href"]
+    C --> D["GET /location-bundles/F1234848431<br/>?valid-at=2027-11-01"]
+    D --> E["Zeitscheibe zum Lieferbeginn"]
+    E --> F(["Belieferung beginnt mit<br/>Kenntnis der Struktur"])
+
+    classDef ok fill:#CCFBF1,stroke:#14B8A6,color:#134E4A
+    classDef ziel fill:#0F766E,stroke:#115E59,color:#F0FDFA
+    class B,D ok
+    class F ziel
+```
+
+## Die Filter der Listenressource
+
+`GET /location-bundles` ist die Operation, die den Vollversand aller Bündel an alle
+Berechtigten ersetzt. Der Berechtigte fragt bedarfsgerecht ab:
+
+| Parameter | Wirkung |
+|---|---|
+| `market-location` | Nur Bündel, die diese Marktlokation oder Tranche enthalten |
+| `metering-location` | Nur Bündel, die diese Messlokation enthalten |
+| `network-location` | Nur Bündel, die diese Netzlokation enthalten |
+| `changed-since` | Nur Bündel, die seit diesem Zeitpunkt geändert wurden |
+| `valid-at` | Nur Bündel, die zu diesem Stichtag Objekte enthalten (Standard: heute) |
+| `sort` | `locationBundleId`, `-locationBundleId`, `changedAt`, `-changedAt` |
+| `page-size`, `cursor` | Paginierung, 1 bis 100 Elemente je Seite |
+
+<Tip>
+  `changed-since` ermöglicht dem Berechtigten einen **inkrementellen Abgleich**, ohne den
+  Gesamtbestand zu übertragen. Das ist der Weg, auf dem ein Marktpartner nach einem Ausfall
+  seiner Systeme wieder aufholt — ein Vorgang, für den die konsultierte Fassung keinen
+  Mechanismus vorsieht.
+</Tip>
+
+## Bewertung
+
+**Selbstbedienung, sobald die Berechtigung besteht.** Kein Wartezustand, kein Anlass für einen
+Klärfall.
+
+<Warning>
+  Dies ist neben [Vorfall A](/ablaeufe/stand-pruefen) der zweite der vier alltäglichen
+  Vorgänge, der in der konsultierten Fassung architektonisch **gar nicht** durchführbar ist
+  und in der Praxis auf manuelle Klärung ausweichen muss.
+</Warning>
+
+Die Berechtigungsfrage bleibt unverändert: Der Lieferant sieht nur, was ihm fachlich zusteht.
+Geändert ist nur, dass er es **abrufen** kann, statt darauf zu warten. Siehe
+[Sicherheit](/architektur/sicherheit#berechtigung-ist-fachlich-nicht-technisch).

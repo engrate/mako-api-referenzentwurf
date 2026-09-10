@@ -1,0 +1,135 @@
+---
+title: "Konventionen"
+description: "Medientypen, Dokumentenhülle, Paginierung, Header und Statuscodes, die für alle Operationen gelten."
+---
+
+## Medientypen
+
+| Medientyp | Verwendung |
+|---|---|
+| `application/vnd.edi-energy+json` | Nutzdaten in Anfragen und Antworten |
+| `application/merge-patch+json` | Anfragekörper der `PATCH`-Operationen (RFC 7396) |
+| `application/problem+json` | Fehlerantworten nach RFC 9457 |
+
+## Dokumentenhülle
+
+Jede Antwort mit Nutzdaten trägt die Nutzdaten unter `data` und die Verweise unter `links`.
+Listen tragen zusätzlich `links.next` und `links.prev`.
+
+<CodeGroup>
+```json Einzelressource
+{
+  "data": {
+    "type": "Lokationsbuendel",
+    "locationBundleId": "F1234848431",
+    "href": "/nb/2026-2/location-bundles/F1234848431",
+    "networkOperator": { "marketPartnerId": "9900987654321", "role": "NB" },
+    "timeSlices": [ "…" ]
+  },
+  "links": {
+    "self":          { "href": "/nb/2026-2/location-bundles/F1234848431" },
+    "timeSlices":    { "href": "/nb/2026-2/location-bundles/F1234848431/time-slices" },
+    "clearingCases": { "href": "/nb/2026-2/location-bundles/F1234848431/clearing-cases" }
+  }
+}
+```
+
+```json Liste
+{
+  "data": [
+    {
+      "type": "Lokationsbuendel",
+      "locationBundleId": "F1234848431",
+      "href": "/nb/2026-2/location-bundles/F1234848431",
+      "changedAt": "2027-09-14T08:12:03Z",
+      "validFrom": "2027-10-01",
+      "validTo": null
+    }
+  ],
+  "links": {
+    "self": { "href": "/nb/2026-2/location-bundles?page-size=20" },
+    "next": { "href": "/nb/2026-2/location-bundles?page-size=20&cursor=…" }
+  }
+}
+```
+</CodeGroup>
+
+Die Listenelemente sind **Zusammenfassungen** mit `href`, nicht vollständige Bündel. Wer
+mehr braucht, folgt dem Verweis. Das ist der Grund, warum die Liste auch bei vielen
+Berechtigungen nicht zur Vollübermittlung wird.
+
+## Paginierung
+
+<ParamField query="page-size" type="integer" default="20">
+  Maximale Anzahl Elemente je Seite, 1 bis 100.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Fortsetzungsmarke aus `links.next` einer vorangegangenen Antwort. Für Clients ist der Wert
+  undurchsichtig; aus seiner Struktur darf nicht auf den verwendeten Paginierungsmechanismus
+  geschlossen werden.
+</ParamField>
+
+Alle Listenressourcen sind paginiert, filterbar und — bei `GET /location-bundles` — über
+`sort` sortierbar.
+
+## Header
+
+| Header | Richtung | Zweck |
+|---|---|---|
+| `ETag` | Antwort | Version der Ressource für bedingte Anfragen |
+| `Last-Modified` | Antwort | Zeitpunkt der letzten Änderung |
+| `Cache-Control` | Antwort | Zwischenspeicherbarkeit, etwa `private, max-age=3600` |
+| `If-None-Match` | Anfrage | Bekannter `ETag`; führt bei unverändertem Stand zu `304` |
+| `If-Match` | Anfrage | Pflicht bei schreibenden Zugriffen; verhindert verlorene Änderungen |
+| `Deprecation` | Antwort | Abkündigung nach RFC 8594, maschinenlesbar |
+| `Sunset` | Antwort | Zeitpunkt, ab dem die Ressource wegfällt (RFC 8594) |
+| `Retry-After` | Antwort | Wartezeit bei `202`, `429` und `503` |
+| `Idempotency-Key` | Anfrage | Optional bei `POST` auf Clearing-Fälle, zur Duplikatvermeidung |
+
+Siehe [Nebenläufigkeit und Zwischenspeicherung](/architektur/nebenlaeufigkeit).
+
+## Statuscodes
+
+<AccordionGroup>
+  <Accordion title="Erfolg" icon="circle-check">
+    | Code | Bedeutung |
+    |---|---|
+    | `200` | Ressource wird zurückgegeben |
+    | `201` | Vorgang erzeugt; `Location` nennt seine URL |
+    | `202` | Angenommen, Ergebnis folgt unter der in `Location` genannten URL |
+    | `204` | Ausgeführt, kein Inhalt — `DELETE` und Ereignisannahme |
+    | `304` | Unverändert seit dem in `If-None-Match` genannten Stand |
+  </Accordion>
+  <Accordion title="Fehler des Aufrufers" icon="circle-exclamation">
+    | Code | Bedeutung |
+    |---|---|
+    | `400` | Fehlerhafte Anfrage |
+    | `401` | Nicht authentisiert |
+    | `403` | Authentisiert, aber für diese Ressource und diesen Zeitraum nicht berechtigt |
+    | `404` | Ressource nicht vorhanden |
+    | `409` | Fachlicher Konflikt — etwa ein bereits offener Clearing-Fall zum selben Sachverhalt |
+    | `412` | Der `If-Match`-`ETag` entspricht nicht dem aktuellen Stand |
+    | `422` | Syntaktisch gültig, fachlich nicht verarbeitbar; `errors` nennt die Fundstellen |
+    | `428` | Schreibender Zugriff ohne `If-Match` |
+    | `429` | Ratenbegrenzung erreicht; `Retry-After` gesetzt |
+  </Accordion>
+  <Accordion title="Fehler des Anbieters" icon="server">
+    | Code | Bedeutung |
+    |---|---|
+    | `503` | Vorübergehend nicht verfügbar; `Retry-After` gesetzt |
+  </Accordion>
+</AccordionGroup>
+
+Jede Fehlerantwort trägt einen Körper nach RFC 9457 — auch `400` und `422`. Siehe
+[Fehlerbehandlung](/architektur/fehlerbehandlung).
+
+## Datumsangaben
+
+Zeitscheibengrenzen sind **Kalendertage** im Format `YYYY-MM-DD`. Der zugehörige Zeitpunkt
+ist stets der Tagesbeginn 00:00 Uhr gesetzlicher deutscher Zeit. Zeitstempel von Vorgängen
+(`changedAt`, `openedAt`, `occurredAt`, `resolvedAt`) sind dagegen vollständige
+`date-time`-Angaben.
+
+Die Begründung für diese Unterscheidung steht unter
+[Zeitscheiben](/architektur/zeitscheiben#kalendertag-statt-utc-zeitstempel).

@@ -1,0 +1,120 @@
+---
+title: "Schnellstart"
+description: "Spezifikation und Beispiele in zwei Befehlen selbst nachprüfen."
+---
+
+Der Entwurf ist nicht als Behauptung gedacht, sondern als überprüfbarer Gegenstand. Die
+Prüfung läuft lokal in unter einer Minute und bei jedem Push automatisch über GitHub Actions.
+
+## Prüfen
+
+<Steps>
+  <Step title="Repository holen">
+    ```bash
+    git clone https://github.com/engrate/mako-api-referenzentwurf.git
+    cd mako-api-referenzentwurf
+    ```
+
+    Für den zur Konsultation eingereichten Stand stattdessen den Tag auschecken:
+
+    ```bash
+    git checkout konsultation-2026-08
+    ```
+  </Step>
+  <Step title="Abhängigkeiten installieren">
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+    Drei Pakete: `openapi-spec-validator`, `jsonschema`, `PyYAML`. Python 3.12 ist die in
+    der CI verwendete Fassung.
+  </Step>
+  <Step title="Prüfung ausführen">
+    ```bash
+    python3 tools/validate.py
+    ```
+
+    Das Werkzeug validiert die Spezifikation gegen OpenAPI 3.1 und jedes Beispiel gegen das
+    zugehörige Schema. Für die beiden mit `UNGUELTIG` benannten Beispiele gilt die umgekehrte
+    Erwartung: Werden sie akzeptiert, schlägt die Prüfung fehl.
+  </Step>
+</Steps>
+
+### Erwartete Ausgabe
+
+```text
+1. OpenAPI-Spezifikation
+   OK  netzbetreiber-api.yaml ist gültiges OpenAPI 3.1.0
+       14 Pfade, 22 Operationen, 61 Schemas
+       Verbverteilung: GET=13, PUT=2, POST=3, PATCH=2, DELETE=2
+
+2. Beispiele gegen die Schemas
+   OK  01-pauschale-marktlokation.json
+   OK  02-ueberschusseinspeisung.json
+   OK  03-speicher-ladepunkt.json
+   OK  04-UNGUELTIG-pauschal-mit-obis.json
+       erwartungsgemäß abgelehnt bei /data/timeSlices/0/members/1
+   OK  05-UNGUELTIG-unzulaessige-kante.json
+       erwartungsgemäß abgelehnt bei /data/timeSlices/0/relations/0
+   OK  06-clearing-fall.json
+   OK  07-aenderungsereignis.json
+
+Alle Prüfungen bestanden.
+```
+
+<Tip>
+  Die Kennzahlen in der ersten Ausgabezeile sind nicht eingetragen, sondern beim Lauf
+  ausgezählt. Alle Zahlenangaben in dieser Dokumentation stammen aus derselben Quelle.
+</Tip>
+
+## Diese Dokumentation prüfen
+
+Ein zweites Werkzeug prüft die Dokumentationsseite selbst: dass `docs.json` gültig ist, dass
+jede in der Navigation genannte Seite existiert und dass die verwiesene OpenAPI-Datei am
+angegebenen Ort liegt.
+
+```bash
+python3 tools/validate_docs.py
+```
+
+Beide Werkzeuge laufen im Workflow
+[`.github/workflows/validate.yml`](https://github.com/engrate/mako-api-referenzentwurf/blob/main/.github/workflows/validate.yml).
+Details unter [Prüfwerkzeug](/referenz/pruefwerkzeug).
+
+## Dokumentation lokal ansehen
+
+Diese Seite ist mit [Mintlify](https://mintlify.com) gebaut. Die Konfiguration liegt als
+`docs.json` im Wurzelverzeichnis des Repositorys.
+
+```bash
+npm i -g mint
+mint dev
+```
+
+Die Vorschau läuft danach auf `http://localhost:3000`. Die API-Referenz wird dabei direkt
+aus `openapi/netzbetreiber-api.yaml` erzeugt — es gibt keine zweite, abschreibbare Fassung
+der Spezifikation.
+
+## Wo was liegt
+
+| Pfad | Inhalt |
+|---|---|
+| `openapi/netzbetreiber-api.yaml` | OpenAPI 3.1 — 14 Pfade, 22 Operationen, 61 Schemas |
+| `examples/01–03` | Gültige Bündel: pauschale MaLo, Überschusseinspeisung, Speicher mit Ladepunkt |
+| `examples/04–05` | Negativbeispiele, die abgelehnt werden müssen |
+| `examples/06–07` | Clearing-Fall mit Zustand, leichtgewichtiges Änderungsereignis |
+| `Gegenueberstellung.md` | Vier Geschäftsvorfälle in beiden Varianten, mit Aufrufzählung |
+| `tools/validate.py` | Prüfwerkzeug für Spezifikation und Beispiele |
+| `tools/validate_docs.py` | Prüfwerkzeug für diese Dokumentation |
+| `docs.json` | Mintlify-Konfiguration |
+
+## Weiter
+
+<CardGroup cols={2}>
+  <Card title="Ressourcenmodell" icon="sitemap" href="/architektur/ressourcenmodell">
+    Welche Ressourcen es gibt und wie sie verlinkt sind.
+  </Card>
+  <Card title="API-Referenz" icon="code" href="/api-referenz/einfuehrung">
+    Jede Operation mit Parametern, Antworten und Fehlercodes.
+  </Card>
+</CardGroup>

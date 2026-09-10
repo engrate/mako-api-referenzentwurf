@@ -1,0 +1,186 @@
+---
+title: "Beispiele"
+description: "Sieben Beispiel-Payloads, davon zwei Negativbeispiele, die abgelehnt werden müssen."
+---
+
+Alle Beispiele liegen unter
+[`examples/`](https://github.com/engrate/mako-api-referenzentwurf/tree/main/examples) und
+werden bei jedem Lauf von [`tools/validate.py`](/referenz/pruefwerkzeug) gegen die Schemas
+geprüft.
+
+<Note>
+  Die Beispieldateien tragen erklärende Felder mit führendem Unterstrich — `_beschreibung`,
+  `_schema`, `_erwartet`. Sie sind **nicht Teil der Nutzdaten** und werden vor der Prüfung
+  entfernt. Ein echter Payload enthält sie nicht.
+</Note>
+
+## Gültige Bündel
+
+<AccordionGroup>
+  <Accordion title="01 — Pauschale Marktlokation ohne Zähler" icon="lightbulb" defaultOpen>
+    Straßenbeleuchtung. Mitteilung Nr. 57 verlangt, dass künftig jeder Marktlokation Strom
+    mindestens eine Messlokation zugeordnet ist; für zählerlose Marktlokationen ist dies eine
+    pauschale Messlokation mit Zählpunktbezeichnung, aber ohne Messeinrichtung.
+
+    Der Typ `pauschal` macht dies im Schema explizit: OBIS-Kennzahlen oder eine
+    Konfigurations-ID sind hier **nicht darstellbar**.
+
+    ```mermaid
+    flowchart LR
+        N["Netzlokation<br/>E1234848431"] --> M["Messlokation …3054<br/><i>pauschal</i>"]
+        M --> L["Marktlokation<br/>57685676748"]
+    ```
+
+    Schema: `LocationBundleDocument` ·
+    [Datei ansehen](https://github.com/engrate/mako-api-referenzentwurf/blob/main/examples/01-pauschale-marktlokation.json)
+  </Accordion>
+
+  <Accordion title="02 — Überschusseinspeisung mit zwei Zeitscheiben" icon="solar-panel">
+    PV-Anlage mit Eigenverbrauch. Ein Zweirichtungszähler an einer Messlokation, daraus eine
+    Verbrauchs- und eine Erzeugungsmarktlokation.
+
+    Zeigt **zwei Zeitscheiben**: Zubau eines Speichers zum 01.01.2028, mit explizitem `validTo`
+    auf der ersten Scheibe.
+
+    | Zeitscheibe | `validFrom` | `validTo` | Knoten |
+    |---|---|---|---|
+    | 1 | `2027-10-01` | `2028-01-01` | NeLo, MeLo, 2× MaLo, TR |
+    | 2 | `2028-01-01` | `null` | NeLo, MeLo, 2× MaLo, 2× TR, SR |
+
+    Schema: `LocationBundleDocument` ·
+    [Datei ansehen](https://github.com/engrate/mako-api-referenzentwurf/blob/main/examples/02-ueberschusseinspeisung.json)
+  </Accordion>
+
+  <Accordion title="03 — Speicher und Ladepunkt mit Kaskade und Tranchen" icon="battery-full">
+    Speicher und Ladepunkt hinter einem Netzanschluss mit Unterzählung — der Fall, für den die
+    Festlegung **MiSpeL** (Az. 618-25-02) die Rechenformeln zur anteiligen Zuordnung
+    viertelstündlicher Mengen definiert.
+
+    Zeigt eine Messlokationskaskade (Hauptzähler mit zwei Unterzählern), Tranchen an der
+    Erzeugungsmarktlokation und eine steuerbare Ressource.
+
+    <Tip>
+      Genau dieser Fall war unter der bisherigen Codeliste der Lokationsbündelstrukturen
+      typischerweise nur als „nicht standardisiert" abbildbar. Als typisierter Graph mit
+      `MesslokationZuMesslokation`-Kanten ist er regulär darstellbar.
+    </Tip>
+
+    Schema: `LocationBundleDocument` ·
+    [Datei ansehen](https://github.com/engrate/mako-api-referenzentwurf/blob/main/examples/03-speicher-ladepunkt.json)
+  </Accordion>
+</AccordionGroup>
+
+## Negativbeispiele
+
+Für diese beiden gilt die **umgekehrte Erwartung**: Werden sie akzeptiert, schlägt die Prüfung
+fehl — denn dann leistet das Schema nicht, was es leisten soll. Sie tragen
+`"_erwartet": "ungueltig"`.
+
+### Pauschale Messlokation mit OBIS-Kennzahl
+
+```json 04-UNGUELTIG-pauschal-mit-obis.json (Auszug)
+{
+  "type": "Messlokation",
+  "meloId": "DE00014545768S0000000000000003054",
+  "metering": {
+    "type": "pauschal",
+    "configurationId": "K-2027-9999",
+    "obisCodes": ["1-0:1.8.0"]
+  }
+}
+```
+
+Fachlich unmöglich: Eine pauschale Messlokation hat keine Messeinrichtung.
+
+<Columns cols={2}>
+  <Card title="Konsultierte Fassung" icon="circle-check" horizontal>
+    **Schemagültig.** Die Unterscheidung zwischen pauschaler und gemessener Messlokation ist
+    dort nicht modelliert; die Bedingung steht als natürlichsprachliche Bedingung im
+    Anwendungshandbuch und wird von jedem Marktpartner eigenständig implementiert. Der Fehler
+    fällt im Produktivbetrieb auf — als Klärfall.
+  </Card>
+  <Card title="Referenzentwurf" icon="circle-xmark" horizontal>
+    **Abgelehnt** bei `/data/timeSlices/0/members/1`. `metering` ist eine tagged union über
+    `iMS`, `mME` und `pauschal`; der Typ `pauschal` sieht weder `configurationId` noch
+    `obisCodes` vor, und `additionalProperties: false` schließt sie aus.
+  </Card>
+</Columns>
+
+### Kante außerhalb des Katalogs
+
+```json 05-UNGUELTIG-unzulaessige-kante.json (Auszug)
+{
+  "relations": [
+    { "kind": "NetzlokationZuMarktlokation", "from": "EZZ00000002", "to": "57685676748" }
+  ]
+}
+```
+
+Der Payload ordnet eine Marktlokation unmittelbar einer Netzlokation zu. Im Datenmodell hängen
+Marktlokationen an **Messlokationen**.
+
+Der Entwurf modelliert die Zuordnungen als typisierte Kanten mit einem abschließenden Katalog
+zulässiger Quell-Ziel-Kombinationen. `NetzlokationZuMarktlokation` ist darin nicht enthalten;
+die Kante wird bei `/data/timeSlices/0/relations/0` abgelehnt.
+
+<Tip>
+  Dies beantwortet zugleich einen Antrag aus der Stellungnahme: Der dort geforderte Katalog
+  fachlicher Validierungsregeln für Lokationsbündel muss nicht als Prosa im Anwendungshandbuch
+  stehen. Er kann Teil des Schemas sein und ist dann automatisiert prüfbar.
+</Tip>
+
+## Weitere Ressourcen
+
+<AccordionGroup>
+  <Accordion title="06 — Clearing-Fall mit Zustand und Abschluss" icon="gavel">
+    Der Lieferant hat beim Abruf festgestellt, dass ihm eine Tranche fehlt, und einen Fall
+    eröffnet. `observedETag` hält fest, auf welchen Stand er sich bezieht — auch wenn der
+    Netzbetreiber zwischenzeitlich ändert.
+
+    Der Fall hat eine URL, eine Frist (`dueAt`) und einen definierten Endzustand
+    (`state: beigelegt`) mit `resolution.correctedBundle` auf den korrigierten Stand. Die
+    Antwortcodes `decisionTree: E_0594` und `responseCode: A10` sind unverändert aus der
+    bestehenden Regulierung.
+
+    Schema: `ClearingCaseDocument` ·
+    [Datei ansehen](https://github.com/engrate/mako-api-referenzentwurf/blob/main/examples/06-clearing-fall.json)
+    · [Ablauf](/ablaeufe/clearing)
+  </Accordion>
+
+  <Accordion title="07 — Leichtgewichtiges Änderungsereignis" icon="bell">
+    Enthält bewusst keine Fachdaten — nur Typ, Zeitpunkt, die URL der betroffenen Ressource und
+    deren `ETag`. Rund 200 Byte.
+
+    ```json
+    {
+      "type": "locationBundleChanged",
+      "eventId": "7f3e9a10-2b4c-4d5e-9f60-1a2b3c4d5e6f",
+      "occurredAt": "2027-10-14T11:05:12Z",
+      "resource": {
+        "href": "/nb/2026-2/location-bundles/FXY98765432",
+        "title": "Lokationsbündel FXY98765432"
+      },
+      "etag": "\"a3f1c9e2\""
+    }
+    ```
+
+    Zum Vergleich: In der konsultierten Fassung wird bei jeder Änderung das vollständige
+    Lokationsbündel mit allen Zeitscheiben an alle Berechtigten versandt.
+
+    Schema: `ChangeEvent` ·
+    [Datei ansehen](https://github.com/engrate/mako-api-referenzentwurf/blob/main/examples/07-aenderungsereignis.json)
+    · [Ablauf](/ablaeufe/aenderung-verteilen)
+  </Accordion>
+</AccordionGroup>
+
+## Übersicht
+
+| Datei | Schema | Erwartung |
+|---|---|---|
+| `01-pauschale-marktlokation.json` | `LocationBundleDocument` | gültig |
+| `02-ueberschusseinspeisung.json` | `LocationBundleDocument` | gültig |
+| `03-speicher-ladepunkt.json` | `LocationBundleDocument` | gültig |
+| `04-UNGUELTIG-pauschal-mit-obis.json` | `LocationBundleDocument` | **muss abgelehnt werden** |
+| `05-UNGUELTIG-unzulaessige-kante.json` | `LocationBundleDocument` | **muss abgelehnt werden** |
+| `06-clearing-fall.json` | `ClearingCaseDocument` | gültig |
+| `07-aenderungsereignis.json` | `ChangeEvent` | gültig |

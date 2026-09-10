@@ -1,0 +1,79 @@
+---
+title: "API-Referenz"
+sidebarTitle: "Einführung"
+description: "22 Operationen auf 14 Pfaden, erzeugt aus openapi/netzbetreiber-api.yaml."
+---
+
+Die Seiten dieses Bereichs sind vollständig aus
+[`openapi/netzbetreiber-api.yaml`](https://github.com/engrate/mako-api-referenzentwurf/blob/main/openapi/netzbetreiber-api.yaml)
+erzeugt. Es gibt keine zweite, abschreibbare Fassung der Spezifikation: Was hier steht,
+steht in der Datei, die das Prüfwerkzeug gegen OpenAPI 3.1 validiert.
+
+<Info>
+  Die Endpunkte sind **nicht erreichbar**. Der `servers`-Block nennt ein Muster mit
+  Platzhaltern (`https://{host}/nb/{basePath}`), weil Host und Basispfad in der
+  Marktkommunikation über den dezentralen Verzeichnisdienst aufgelöst werden. Die
+  Beispielaufrufe dieser Dokumentation zeigen Form und Semantik, nicht einen laufenden
+  Dienst.
+</Info>
+
+## Die sechs Ressourcengruppen
+
+<CardGroup cols={2}>
+  <Card title="Lokationsbündel" icon="layer-group">
+    8 Operationen. Abruf und Pflege der Bündel und ihrer Zeitscheiben in der Hoheit des
+    Netzbetreibers.
+  </Card>
+  <Card title="Lokationen" icon="location-dot">
+    3 Operationen. Netz-, Markt- und Messlokation als eigene, abrufbare Einzelressourcen.
+  </Card>
+  <Card title="Clearing" icon="gavel">
+    4 Operationen. Abweichende Sichtweisen als Vorgang mit Zustand, Frist und Endzustand.
+  </Card>
+  <Card title="Netzbetreiberwechsel" icon="arrow-right-arrow-left">
+    2 Operationen. Übergabepaket über `202 Accepted` und Ergebnisressource.
+  </Card>
+  <Card title="Benachrichtigung" icon="bell">
+    4 Operationen plus Callback. Abonnement leichtgewichtiger Änderungsereignisse.
+  </Card>
+  <Card title="Betrieb" icon="gear">
+    1 Operation. Maschinenlesbarer Umsetzungsstand, ohne Authentisierung abrufbar.
+  </Card>
+</CardGroup>
+
+## Verbverteilung
+
+| Verb | Anzahl | Bedeutung in diesem Entwurf |
+|---|---:|---|
+| `GET` | 13 | Lesen. In der konsultierten Fassung gar nicht vorhanden. |
+| `PUT` | 2 | Vollständiges Setzen, idempotent. Ersetzt den Idempotenzschlüssel im Header. |
+| `POST` | 3 | Erzeugen eines neuen Vorgangs: Clearing-Fall, Übergabepaket, Abonnement. |
+| `PATCH` | 2 | Teiländerung per `application/merge-patch+json`, mit `If-Match`. |
+| `DELETE` | 2 | Zeitscheibe entfernen, Abonnement beenden. |
+
+## Schreibrechte
+
+Lesen steht jedem Berechtigten offen. Schreibend zugreifen darf nur, wer fachlich
+zuständig ist:
+
+| Operation | Berechtigt | Scope |
+|---|---|---|
+| `PUT` / `PATCH` auf Bündel und Zeitscheiben | verantwortlicher Netzbetreiber | `lokationsbuendel:schreiben` |
+| Clearing-Fall eröffnen | Berechtigter mit abweichender Sicht | `clearing:schreiben` |
+| Clearing-Fall fortschreiben | Netzbetreiber; Rückzug durch den Eröffner | `clearing:schreiben` |
+| Übergabepaket anfordern | künftiger Netzbetreiber | `netzbetreiberwechsel:schreiben` |
+| Abonnement verwalten | der Abonnent selbst | `benachrichtigung:schreiben` |
+
+Einzelheiten unter [Sicherheit](/architektur/sicherheit).
+
+## Bevor Sie die Referenz lesen
+
+<CardGroup cols={2}>
+  <Card title="Konventionen" icon="list-check" href="/api-referenz/konventionen">
+    Medientypen, Dokumentenhülle, Paginierung, Header und Statuscodes — einmal erklärt,
+    statt auf jeder Operationsseite wiederholt.
+  </Card>
+  <Card title="Datenmodell" icon="diagram-project" href="/architektur/datenmodell">
+    Knoten, Kanten und Zeitscheiben des Lokationsbündels.
+  </Card>
+</CardGroup>

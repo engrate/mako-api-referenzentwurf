@@ -23,3 +23,6 @@ jobs:
 
       - name: Spezifikation und Beispiele validieren
         run: python tools/validate.py
+
+      - name: Dokumentation validieren
+        run: python tools/validate_docs.py

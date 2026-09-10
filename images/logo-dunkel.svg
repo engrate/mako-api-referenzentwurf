@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 32" width="268" height="32" role="img" aria-label="MaKo-API Referenzentwurf">
+  <g stroke="#2DD4BF" stroke-width="1.7" stroke-linecap="round" fill="none">
+    <path d="M6 7.5 L6 16 L22 16"/>
+    <path d="M6 16 L6 24.5 L22 24.5"/>
+  </g>
+  <g fill="#5EEAD4">
+    <circle cx="6" cy="7.5" r="2.8"/>
+    <circle cx="22" cy="16" r="2.8"/>
+    <circle cx="22" cy="24.5" r="2.8"/>
+    <circle cx="6" cy="16" r="1.9" fill="#5EEAD4"/>
+  </g>
+  <text x="36" y="21" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15.5" font-weight="650" fill="#F8FAFC" letter-spacing="-0.2">MaKo-API</text>
+  <text x="119" y="21" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15.5" font-weight="400" fill="#94A3B8" letter-spacing="-0.1">Referenzentwurf</text>
+</svg>
