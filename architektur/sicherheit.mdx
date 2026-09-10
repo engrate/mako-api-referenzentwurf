@@ -116,10 +116,10 @@ flowchart LR
     D -->|nein| E403
     D -->|ja| F["200 / 304"]
 
-    classDef fehler fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D
-    classDef ok fill:#CCFBF1,stroke:#14B8A6,color:#134E4A
-    class E401,E403 fehler
-    class F ok
+    classDef abgelehnt fill:#EFEFEF,stroke:#6A6A6A,color:#4A4A4A
+    classDef erteilt fill:#FFBE26,stroke:#E5AB22,color:#1A1A1A
+    class E401,E403 abgelehnt
+    class F erteilt
 ```
 
 Ein Lieferant, dessen Belieferung zum 31.12.2027 endet, kann am 01.02.2028 keine Zeitscheibe

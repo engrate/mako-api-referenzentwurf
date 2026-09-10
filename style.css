@@ -1,0 +1,310 @@
+/* ===========================================================================
+   Engrate Design Philosophy, angewandt auf die Dokumentation.
+
+   Grundregeln, die hier umgesetzt sind:
+   - 10 % Farbe, 90 % Grauskala. Sunflower ist der Akzent, nicht die Flaeche.
+   - Niemals reines Weiss als Hintergrund.
+   - Niemals reines Schwarz als Textfarbe.
+   - Work Sans durchgaengig in Regular; Hierarchie ueber Groesse und Laufweite.
+   - Libre Baskerville ausschliesslich fuer die Hero-Zeile ab 60 pt.
+   - Schaltflaechen immer vollstaendig gerundet.
+   - Text linksbuendig.
+   =========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500&family=Libre+Baskerville:wght@400&display=swap');
+
+:root {
+  /* Heldenfarbe */
+  --en-sunflower: #FFBE26;
+  --en-sunflower-hover: #E5AB22;
+
+  /* Gelbspektrum - eigenstaendige Farben, keine Abstufungen */
+  --en-lemon: #FFF8A2;
+  --en-vanilla: #FFFCD0;
+  --en-eggshell: #FFFDE8;
+
+  /* Grauskala - die meistbenutzte "Farbe" der Identitaet */
+  --en-text: #1A1A1A;
+  --en-text-2: #4A4A4A;
+  --en-text-3: #6A6A6A;
+  --en-bg: #FAFAFA;
+  --en-bg-alt: #F5F5F5;
+  --en-card: #F9F9F9;
+  --en-contrast: #EFEFEF;
+  --en-line: #E5E5E5;
+}
+
+/* --- Flaechen: nie reines Weiss ------------------------------------------ */
+
+html,
+body,
+#__next,
+main,
+[class*='bg-white'],
+[class*='bg-background'] {
+  background-color: var(--en-bg);
+}
+
+/* --- Text: nie reines Schwarz -------------------------------------------- */
+
+body {
+  color: var(--en-text-2);
+  font-family: 'Work Sans', system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--en-text);
+  font-family: 'Work Sans', system-ui, sans-serif;
+  font-weight: 400;
+  text-align: left;
+}
+
+/* Laufweite nach Vorgabe: negativ bei grossen, positiv bei kleinen Graden */
+h1 { font-size: 2.5rem;  line-height: 1.025; letter-spacing: -0.04em; }
+h2 { font-size: 1.875rem; line-height: 1.07; letter-spacing: -0.03em; }
+h3 { font-size: 1.5rem;  line-height: 1.08; letter-spacing: -0.02em; }
+h4 { font-size: 1.25rem; line-height: 1.15; letter-spacing: -0.01em; }
+
+p, li, td {
+  color: var(--en-text-2);
+  letter-spacing: 0.01em;
+}
+
+/* Work Sans nie fett. Medium ist laut Vorgabe die einzige Ausnahme und
+   bleibt der Betonung im Fliesstext vorbehalten. */
+strong, b, th, dt {
+  font-weight: 500;
+  color: var(--en-text);
+}
+
+/* Beschriftungen und Metatext in Tertiaergrau, weite Laufweite */
+.text-xs, figcaption, .eyebrow {
+  color: var(--en-text-3);
+  letter-spacing: 0.08em;
+}
+
+/* --- Hero: die einzige Stelle fuer Libre Baskerville --------------------- */
+
+/* Libre Baskerville ist laut Vorgabe ausschliesslich fuer Ueberschriften ab
+   60 pt zugelassen. Nur die Startseite hat eine solche Zeile; sie markiert
+   sich dafuer selbst mit <div class="hero-page" />. 80 px = 60 pt. */
+body:has(.hero-page) h1 {
+  font-family: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+  font-size: 80px;
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  color: var(--en-text);
+}
+
+.hero-page { display: none; }
+
+@media (max-width: 900px) {
+  body:has(.hero-page) h1 { font-size: 40px; letter-spacing: -0.015em; }
+  h1 { font-size: 2rem; }
+}
+
+/* --- Schaltflaechen: immer Kapselform ----------------------------------- */
+
+/* Nur echte Schaltflaechen. 'a[class*=rounded]' wuerde auch die Karten
+   treffen und sie zu Kapseln verformen. */
+button:not([class*='rounded-none']),
+header a[class*='bg-primary'],
+nav a[class*='bg-primary'] {
+  border-radius: 9999px !important;
+}
+
+/* Nur die Schaltflaeche in der Kopfzeile. Nicht auf [class*='bg-primary']
+   allgemein: der aktive Navigationseintrag traegt 'bg-primary/10' und wuerde
+   dadurch zur vollflaechigen Sunflower-Kapsel. */
+header a[class*='bg-primary'],
+header button[class*='bg-primary'] {
+  background-color: var(--en-sunflower) !important;
+  color: var(--en-text) !important;
+  padding: 0.6rem 2rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+header a[class*='bg-primary']:hover,
+header button[class*='bg-primary']:hover {
+  background-color: var(--en-sunflower-hover) !important;
+  transform: translateY(-1px);
+}
+
+/* --- Karten und Felder: Grau, nicht Weiss ------------------------------- */
+
+#content-area [class*='rounded-'][class*='border'] {
+  background-color: var(--en-card);
+  border-color: var(--en-line);
+}
+
+hr, table, th, td {
+  border-color: var(--en-line);
+}
+
+thead th {
+  background-color: var(--en-bg-alt);
+  color: var(--en-text);
+  font-weight: 500;
+}
+
+/* Codeflaechen bleiben in der Grauskala, damit Sunflower seine Wirkung behaelt */
+pre, code {
+  background-color: var(--en-contrast) !important;
+  color: var(--en-text) !important;
+}
+
+pre code {
+  background-color: transparent !important;
+}
+
+/* --- Akzente: die 10 % ---------------------------------------------------- */
+
+/* Hinweisbloecke.
+   Mintlify faerbt sie je nach Typ blau, gruen oder rot. Die Vorgabe kennt
+   diese Farben nicht: das Gelbspektrum traegt die Betonung, die Grauskala
+   den Rest. Unterschieden wird ueber die linke Kante, nicht ueber die
+   Flaeche. */
+#content-area .callout {
+  background-color: var(--en-card) !important;
+  border-color: var(--en-line) !important;
+  border-left: 2px solid var(--en-line) !important;
+  color: var(--en-text-2);
+}
+
+/* Warnungen sind die einzige Stufe, die Sunflower rechtfertigt. */
+#content-area .callout[class*='amber'],
+#content-area .callout[class*='yellow'],
+#content-area .callout[class*='red'],
+#content-area .callout[class*='orange'] {
+  background-color: var(--en-eggshell) !important;
+  border-left-color: var(--en-sunflower) !important;
+}
+
+/* Symbol und Text der Hinweisbloecke in die Grauskala zwingen. */
+#content-area .callout [class*='text-blue'],
+#content-area .callout [class*='text-green'],
+#content-area .callout [class*='text-red'],
+#content-area .callout [class*='text-amber'],
+#content-area .callout [class*='text-yellow'],
+#content-area .callout svg {
+  color: var(--en-text-3) !important;
+}
+
+#content-area .callout p,
+#content-area .callout li {
+  color: var(--en-text-2) !important;
+}
+
+#content-area blockquote {
+  background-color: var(--en-eggshell);
+  border-left: 2px solid var(--en-sunflower);
+  border-radius: 0;
+  color: var(--en-text-2);
+}
+
+/* Der aktive Navigationseintrag ist der wichtigste Farbakzent der Seite. */
+/* Der aktive Eintrag bekaeme aus docs.json eine volle Sunflower-Kapsel.
+   Das ist zu viel Flaeche fuer die 10/90-Regel; Vanilla genuegt. */
+a[aria-current='page'] {
+  background-color: var(--en-vanilla) !important;
+  color: var(--en-text) !important;
+  font-weight: 500;
+  box-shadow: inset 2px 0 0 var(--en-sunflower);
+}
+
+/* Verweise im Text: Sunflower als Unterstreichung, Text bleibt grau. */
+#content-area a:not([class]) {
+  color: var(--en-text);
+  text-decoration-color: var(--en-sunflower);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+#content-area a:not([class]):hover {
+  text-decoration-color: var(--en-sunflower-hover);
+}
+
+/* --- Banner ---------------------------------------------------------------
+   Der Hinweisbalken traegt Sunflower aus docs.json. Das ist genau der Fall,
+   den die Vorgabe beschreibt: die eine Botschaft, die nicht uebersehen werden
+   darf. Keine eigene Regel noetig.
+
+   Achtung: kein Attributselektor auf 'banner'. Tailwind erzeugt Klassen wie
+   pt-[calc(10rem+var(--banner-height,2.5rem))]; [class*='banner'] trifft
+   dann die gesamte Inhaltsspalte.
+   ------------------------------------------------------------------------- */
+
+/* --- Diagramme ----------------------------------------------------------- */
+
+/* Mermaid-Flaechen auf der Seitenfarbe, damit die Diagramme nicht als
+   weisse Kaesten aus der Grauskala herausfallen. */
+.mermaid,
+[class*='mermaid'] svg,
+svg[id^='mermaid'] {
+  background-color: transparent !important;
+}
+
+/* Mermaid faerbt Subgraphen standardmaessig blassgelb und Kantenlabels
+   weiss. Beides in die Grauskala holen, damit Sunflower die einzige Farbe
+   im Diagramm bleibt. */
+svg[id^='mermaid'] .cluster rect,
+[class*='mermaid'] .cluster rect {
+  fill: var(--en-bg-alt) !important;
+  stroke: var(--en-line) !important;
+}
+
+svg[id^='mermaid'] .cluster text,
+[class*='mermaid'] .cluster text {
+  fill: var(--en-text-3) !important;
+}
+
+svg[id^='mermaid'] .edgeLabel,
+svg[id^='mermaid'] .edgeLabel foreignObject div,
+svg[id^='mermaid'] .edgeLabel rect,
+[class*='mermaid'] .edgeLabel {
+  background-color: var(--en-bg) !important;
+  fill: var(--en-bg) !important;
+  color: var(--en-text-2) !important;
+}
+
+svg[id^='mermaid'] .edgeLabel span,
+svg[id^='mermaid'] .edgeLabel p {
+  background-color: var(--en-bg) !important;
+  color: var(--en-text-2) !important;
+}
+
+/* --- API-Referenz --------------------------------------------------------
+   Die erzeugten Operationsseiten bringen eigene Signalfarben mit (gruene
+   Schaltflaeche, rote Pflichtmarkierung). Beide sind in der Vorgabe nicht
+   vorgesehen und werden hier auf Sunflower bzw. Grauskala zurueckgefuehrt.
+   ------------------------------------------------------------------------- */
+
+.tryit-button {
+  background-color: var(--en-sunflower) !important;
+  color: var(--en-text) !important;
+  border-radius: 9999px !important;
+  font-weight: 400 !important;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.tryit-button:hover {
+  background-color: var(--en-sunflower-hover) !important;
+  opacity: 1 !important;
+}
+
+/* Pflicht- und Statusmarkierungen: Information ohne Signalrot. */
+#content-area [class*='bg-red-'],
+#content-area [class*='text-red-'] {
+  background-color: var(--en-contrast) !important;
+  color: var(--en-text-3) !important;
+}
+
+#content-area [class*='text-red-'] {
+  background-color: transparent !important;
+}

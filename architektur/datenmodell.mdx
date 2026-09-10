@@ -25,8 +25,8 @@ flowchart TD
     ME --> ME2["mME<br/><i>obisCodes</i>"]
     ME --> ME3["pauschal<br/><i>kein Zähler</i>"]
 
-    classDef haupt fill:#0F766E,stroke:#115E59,color:#F0FDFA
-    classDef union fill:#CCFBF1,stroke:#14B8A6,color:#134E4A
+    classDef haupt fill:#FFBE26,stroke:#E5AB22,color:#1A1A1A
+    classDef union fill:#FFFCD0,stroke:#E5AB22,color:#1A1A1A
     class LB,TS haupt
     class M,R,ME union
 ```
@@ -154,8 +154,8 @@ flowchart LR
     NELO -->|NetzlokationZuMesslokation| MELO
     MELO -->|MesslokationZuMarktlokation| MALO
 
-    classDef mess fill:#CCFBF1,stroke:#14B8A6,color:#134E4A
-    class MELO mess
+    classDef pauschal fill:#FFBE26,stroke:#E5AB22,color:#1A1A1A
+    class MELO pauschal
 ```
 
 Vollständig nachvollziehbar in
@@ -193,10 +193,8 @@ flowchart LR
     MELO3 --> TR
     MALO2 --> TR
 
-    classDef mess fill:#CCFBF1,stroke:#14B8A6,color:#134E4A
-    classDef markt fill:#0F766E,stroke:#115E59,color:#F0FDFA
-    class MELO1,MELO2,MELO3 mess
-    class MALO1,MALO2 markt
+    classDef kaskade fill:#FFFCD0,stroke:#E5AB22,color:#1A1A1A
+    class MELO1,MELO2,MELO3 kaskade
 ```
 
 Das Beispiel
